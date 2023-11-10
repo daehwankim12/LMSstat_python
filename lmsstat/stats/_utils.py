@@ -1,4 +1,5 @@
 import pandas as pd
+from scipy.stats import false_discovery_control
 
 
 def preprocess_data(data):
@@ -13,7 +14,7 @@ def preprocess_data(data):
 
     # Convert relevant columns to numeric using apply() and to_numeric()
     cols_to_convert = data.columns[2:]
-    data[cols_to_convert] = data[cols_to_convert].apply(pd.to_numeric, errors='coerce')
+    data[cols_to_convert] = data[cols_to_convert].apply(pd.to_numeric, errors="coerce")
 
     # Convert the DataFrame to a data table (not necessary in Python)
     data_final_raw = data.drop(columns=["Sample", "Group"])
@@ -24,3 +25,11 @@ def preprocess_data(data):
     metabolite_names = list(data_final_raw.columns)
 
     return data_final_raw, groups_split, metabolite_names
+
+
+def p_adjust(mat):
+    return mat.apply(
+        false_discovery_control,
+        axis=0,
+        raw=True,
+    )

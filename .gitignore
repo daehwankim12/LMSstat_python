@@ -37,7 +37,7 @@
 .idea/**/dynamic.xml
 .idea/**/uiDesigner.xml
 .idea/**/dbnavigator.xml
-
+test.ipynb
 # Gradle
 .idea/**/gradle.xml
 .idea/**/libraries

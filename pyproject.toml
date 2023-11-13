@@ -4,11 +4,19 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "lmsstat"
+version = "0.0.1"
 authors = [{ name = "Daehwan Kim", email = "kdh5358@snu.ac.kr" }]
-dynamic = ["version", "description"]
+dynamic = ["description"]
 dependencies = [
     "pandas", "numpy", "scipy"
 ]
+license = "MIT"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+requires-python = ">=3.7"
 
 [project.urls]
 Source = "https://github.com/daehwankum12/LMSstat_python"

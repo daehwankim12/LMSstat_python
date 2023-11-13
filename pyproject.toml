@@ -1,0 +1,15 @@
+[build-system]
+requires = ["flit_core >=3.4,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "LMSstat"
+description = "Automation of statistical tests with an identical data input."
+authors = [{ name = "Daehwan Kim", email = "kdh5358@snu.ac.kr" }]
+dynamic = ["version", "description"]
+dependencies = [
+    "pandas", "numpy", "scipy"
+]
+
+[project.urls]
+Source = "https://github.com/daehwankum12/LMSstat_python"

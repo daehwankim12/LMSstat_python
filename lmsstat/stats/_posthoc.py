@@ -1,3 +1,8 @@
+"""
+Copyright https://github.com/maximtrp/scikit-posthocs
+This file is adapted from scikit_posthocs/_posthocs.py
+"""
+
 import numpy as np
 import pandas as pd
 import scipy.stats as ss
@@ -6,6 +11,17 @@ import itertools as it
 
 
 def preprocess_groups(groups_split):
+    """
+    Preprocesses groups_split by padding the data with NaNs to make all groups the same length.
+
+    Args:
+        groups_split (pandas.core.groupby.DataFrameGroupBy): A pandas DataFrameGroupBy object.
+
+    Returns:
+        tuple: A tuple containing:
+            - preprocessed_data (dict): A dictionary containing preprocessed data for each group.
+            - max_length (int): The maximum length of all groups after padding with NaNs.
+    """
     max_length = max(len(group) for name, group in groups_split)
 
     preprocessed_data = {}
@@ -32,6 +48,15 @@ def preprocess_groups(groups_split):
 
 
 def posthoc_scheffe(a: np.ndarray) -> np.ndarray:
+    """
+    Calculate the p-values using the posthoc Scheffe method.
+
+    Parameters:
+        a (np.ndarray): An array of shape (n, k) containing the data for analysis.
+
+    Returns:
+        p_values (np.ndarray): An array of shape (k, k) containing the p-values.
+    """
     k = a.shape[1]
 
     group_means = np.nanmean(a, axis=0)
@@ -55,6 +80,16 @@ def posthoc_scheffe(a: np.ndarray) -> np.ndarray:
 
 
 def scheffe_test(groups_split, metabolite_names):
+    """
+    Calculate the Scheffe's test p-values for each combination of groups and metabolites.
+
+    Parameters:
+        groups_split (pandas.core.groupby.DataFrameGroupBy): A pandas GroupBy object containing the groups split by a certain variable.
+        metabolite_names (list[str]): A list of metabolite names.
+
+    Returns:
+        p_values_df (pandas.core.frame.DataFrame): A pandas DataFrame containing the Scheffe's test p-values for each combination of groups and metabolites.
+    """
     group_names = sorted(groups_split.groups.keys())
     group_combinations = list(it.combinations(group_names, 2))
     num_combinations = len(group_combinations)
@@ -85,6 +120,15 @@ def scheffe_test(groups_split, metabolite_names):
 
 
 def posthoc_dunn(a: np.ndarray) -> np.ndarray:
+    """
+    Calculate the p-values using the posthoc Dunn's method.
+
+    Parameters:
+        a (np.ndarray): An array of shape (n, k) containing the data for analysis.
+
+    Returns:
+        p_values (np.ndarray): An array of shape (k, k) containing the p-values.
+    """
     k = a.shape[1]
     ranks = ss.rankdata(np.ma.masked_invalid(a).compressed())
 
@@ -116,6 +160,16 @@ def posthoc_dunn(a: np.ndarray) -> np.ndarray:
 
 
 def dunn_test(groups_split, metabolite_names):
+    """
+    Calculate the Dunn's test p-values for each combination of groups and metabolites.
+
+    Parameters:
+        groups_split (pandas.core.groupby.DataFrameGroupBy): A pandas GroupBy object containing the groups split by a certain variable.
+        metabolite_names (list[str]): A list of metabolite names.
+
+    Returns:
+        p_values_df (pandas.core.frame.DataFrame): A pandas DataFrame containing the Dunn's test p-values for each combination of groups and metabolites.
+    """
     group_names = sorted(groups_split.groups.keys())
     group_combinations = list(it.combinations(group_names, 2))
     group_combinations = sorted(group_combinations, key=lambda x: x[1])

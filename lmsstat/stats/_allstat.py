@@ -7,12 +7,23 @@ import pandas as pd
 
 
 def allstats(filedir, p_adj=True):
+    """
+    Generates a statistical analysis of the given file.
+
+    Parameters:
+        filedir (str): The directory of the file to be analyzed.
+
+        p_adj (bool, optional): Whether to perform p-value adjustment. Defaults to True.
+
+    Returns:
+        pandas.DataFrame: The statistical analysis results.
+    """
     assert isinstance(filedir, str)
     assert os.path.isfile(filedir)
 
     data = pd.read_csv(filedir)
 
-    data_final_raw, groups_split, metabolite_names = preprocess_data(data)
+    _, groups_split, metabolite_names = preprocess_data(data)
 
     num_groups = len(groups_split)
 

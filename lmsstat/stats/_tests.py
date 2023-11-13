@@ -8,6 +8,16 @@ from scipy.stats import ttest_ind
 
 
 def t_test(groups_split, metabolite_names) -> pd.DataFrame:
+    """
+    Perform t-test on groups to compare their means.
+
+    Args:
+        groups_split (pandas.core.groupby.DataFrameGroupBy): A grouped DataFrame object containing the groups to compare.
+        metabolite_names (List[str]): A list of metabolite names.
+
+    Returns:
+        df_ttest (pandas.core.frame.DataFrame): A DataFrame containing the t-test results for each combination of group pairs.
+    """
     group_names = list(groups_split.groups.keys())
     group_combinations = list(itertools.combinations(group_names, 2))
 
@@ -41,6 +51,16 @@ def t_test(groups_split, metabolite_names) -> pd.DataFrame:
 
 
 def u_test(groups_split, metabolite_names) -> pd.DataFrame:
+    """
+    Perform u-test on groups to compare their means.
+
+    Args:
+        groups_split (pandas.core.groupby.DataFrameGroupBy): A grouped DataFrame object containing the groups to compare.
+        metabolite_names (List[str]): A list of metabolite names.
+
+    Returns:
+        df_utest (pandas.core.frame.DataFrame): A DataFrame containing the u-test results for each combination of group pairs.
+    """
     group_names = list(groups_split.groups.keys())
     group_combinations = list(itertools.combinations(group_names, 2))
 
@@ -74,6 +94,16 @@ def u_test(groups_split, metabolite_names) -> pd.DataFrame:
 
 
 def anova_test(groups_split, metabolite_names) -> pd.DataFrame:
+    """
+    Perform an ANOVA test on groups of data.
+
+    Args:
+        groups_split (pandas.core.groupby.DataFrameGroupBy): A grouped DataFrame object containing the groups to compare.
+        metabolite_names (List[str]): A list of metabolite names.
+
+    Returns:
+        anova_results (pandas.core.frame.DataFrame): A DataFrame containing the p-value for each metabolite.
+    """
     # Prepare a dictionary to hold pre-fetched group data
     group_data = {
         name: group.dropna(subset=metabolite_names) for name, group in groups_split
@@ -91,11 +121,22 @@ def anova_test(groups_split, metabolite_names) -> pd.DataFrame:
 
         # Store the results
         anova_results.at[metabolite, "p-value_ANOVA"] = p_value
+        anova_results = anova_results.astype(float)
 
-    return anova_results.astype(float)
+    return anova_results
 
 
 def kruskal_test(groups_split, metabolite_names) -> pd.DataFrame:
+    """
+    Perform an Kruskal-Wallis test on groups of data.
+
+    Args:
+        groups_split (pandas.core.groupby.DataFrameGroupBy): A grouped DataFrame object containing the groups to compare.
+        metabolite_names (List[str]): A list of metabolite names.
+
+    Returns:
+        kw_results (pandas.core.frame.DataFrame): A DataFrame containing the p-value for each metabolite.
+    """
     # Prepare a dictionary to hold pre-fetched group data
     group_data = {
         name: group.dropna(subset=metabolite_names) for name, group in groups_split
@@ -113,5 +154,6 @@ def kruskal_test(groups_split, metabolite_names) -> pd.DataFrame:
 
         # Store the results
         kw_results.at[metabolite, "p-value_KW"] = p_value
+        kw_results = kw_results.astype(float)
 
-    return kw_results.astype(float)
+    return kw_results

@@ -3,8 +3,7 @@ requires = ["flit_core >=3.4,<4"]
 build-backend = "flit_core.buildapi"
 
 [project]
-name = "LMSstat"
-description = "Automation of statistical tests with an identical data input."
+name = "lmsstat"
 authors = [{ name = "Daehwan Kim", email = "kdh5358@snu.ac.kr" }]
 dynamic = ["version", "description"]
 dependencies = [

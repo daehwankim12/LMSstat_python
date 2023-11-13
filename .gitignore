@@ -17,3 +17,4 @@ venv/
 # Editors
 .idea
 .vscode
+*.iml

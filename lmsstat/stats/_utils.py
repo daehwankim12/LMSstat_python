@@ -33,3 +33,10 @@ def p_adjust(mat):
         axis=0,
         raw=True,
     )
+
+
+def correlation(data, axis="sample"):
+    if axis == "sample":
+        return data.corr()
+    elif axis == "metabolite":
+        return data.transpose().corr()

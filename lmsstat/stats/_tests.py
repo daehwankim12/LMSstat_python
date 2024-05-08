@@ -1,10 +1,7 @@
 import itertools
 
 import pandas as pd
-from scipy.stats import f_oneway
-from scipy.stats import kruskal
-from scipy.stats import mannwhitneyu
-from scipy.stats import ttest_ind
+from scipy.stats import f_oneway, kruskal, mannwhitneyu, ttest_ind, shapiro
 
 
 def t_test(groups_split, metabolite_names) -> pd.DataFrame:
@@ -128,7 +125,7 @@ def anova_test(groups_split, metabolite_names) -> pd.DataFrame:
 
 def kruskal_test(groups_split, metabolite_names) -> pd.DataFrame:
     """
-    Perform an Kruskal-Wallis test on groups of data.
+    Perform a Kruskal-Wallis test on groups of data.
 
     Args:
         groups_split (pandas.core.groupby.DataFrameGroupBy): A grouped DataFrame object containing the groups to compare.
@@ -157,3 +154,7 @@ def kruskal_test(groups_split, metabolite_names) -> pd.DataFrame:
         kw_results = kw_results.astype(float)
 
     return kw_results
+
+
+def norm_test(data):
+    return data.apply(shapiro, axis=0, raw=True)

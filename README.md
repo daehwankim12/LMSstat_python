@@ -3,7 +3,7 @@
 ## Installation
 
 ```bash
-pip install git+https://github.com/daehwankim12/LMSstat_python.git
+pip install git+https://github.com/daehwankim12/LMSstat_python.git@develop
 ```
 
 ## Usage
@@ -12,7 +12,7 @@ pip install git+https://github.com/daehwankim12/LMSstat_python.git
 from lmsstat import stats
 
 filedir = 'your csv file directory'
-result = stats.allstats(filedir) # p-value adjusted by Bonferroni method
+result = stats.allstats(filedir)  # p-value adjusted by Bonferroni method
 
 result.to_csv('result.csv')
 ```

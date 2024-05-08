@@ -8,7 +8,6 @@ version = "0.0.1"
 authors = [{ name = "Daehwan Kim", email = "kdh5358@snu.ac.kr" }]
 dynamic = ["description"]
 dependencies = [
-    "altair",
     "ipykernel",
     "jupyter",
     "matplotlib",
@@ -24,7 +23,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
-requires-python = ">=3.7"
+requires-python = ">=3.9"
 
 [project.urls]
 Source = "https://github.com/daehwankim12/LMSstat_python"

@@ -157,4 +157,10 @@ def kruskal_test(groups_split, metabolite_names) -> pd.DataFrame:
 
 
 def norm_test(data):
-    return data.apply(shapiro, axis=0, raw=True)
+    data = data.rename(columns={data.columns[0]: "Sample", data.columns[1]: "Group"})
+    data.drop(columns=["Sample", "Group"], inplace=True)
+
+    result = data.apply(func=shapiro, axis=0)
+    result.index = ["W-statistic", "p-value"]
+
+    return result

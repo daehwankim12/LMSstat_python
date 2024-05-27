@@ -4,7 +4,7 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "lmsstat"
-version = "0.1.0.dev0"
+version = "0.1.0.dev1"
 readme = "README.md"
 authors = [{ name = "Daehwan Kim", email = "kdh5358@snu.ac.kr" }]
 dynamic = ["description"]
@@ -17,7 +17,8 @@ dependencies = [
     "statsmodels",
     "scikit-learn",
     "altair",
-    "vl-convert-python"
+    "vl-convert-python",
+    "pingouin"
 ]
 license = { file = "LICENSE" }
 classifiers = [

@@ -1,5 +1,5 @@
 from ._tests import t_test, u_test, anova_test, kruskal_test
-from ._posthoc import scheffe_test, dunn_test
+from ._posthoc import scheffe_test, dunn_test, games_howell_test
 from ._utils import preprocess_data, p_adjust
 
 import os
@@ -34,7 +34,8 @@ def allstats(filedir, p_adj=True):
     if num_groups > 2:
         result_anova = anova_test(groups_split, metabolite_names)
         result_kruskal = kruskal_test(groups_split, metabolite_names)
-        result_scheffe = scheffe_test(groups_split, metabolite_names)
+        result_games = games_howell_test(groups_split, metabolite_names)
+        # result_scheffe = scheffe_test(groups_split, metabolite_names)
         result_dunn = dunn_test(groups_split, metabolite_names)
 
     if p_adj:
@@ -51,7 +52,8 @@ def allstats(filedir, p_adj=True):
                 result_t,
                 result_u,
                 result_anova,
-                result_scheffe,
+                result_games,
+                # result_scheffe,
                 result_kruskal,
                 result_dunn,
             ],

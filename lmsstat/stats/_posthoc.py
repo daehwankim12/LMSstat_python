@@ -3,12 +3,12 @@ Copyright https://github.com/maximtrp/scikit-posthocs
 Part of this file is adapted from scikit_posthocs/_posthocs.py
 """
 
+import itertools as it
+
 import numpy as np
 import pandas as pd
 import scipy.stats as ss
 from scipy.stats import false_discovery_control
-import itertools as it
-
 
 # def preprocess_groups(groups_split):
 #     """
@@ -64,7 +64,9 @@ def preprocess_groups(groups_split):
     preprocessed_data = {}
     max_length = 0
     for name, group in groups_split:
-        group_data = {metabolite: group[metabolite].dropna().to_numpy() for metabolite in group}
+        group_data = {
+            metabolite: group[metabolite].dropna().to_numpy() for metabolite in group
+        }
         current_max = max(len(data) for data in group_data.values())
         max_length = max(max_length, current_max)
 
@@ -73,14 +75,16 @@ def preprocess_groups(groups_split):
     # 데이터 패딩
     for name in preprocessed_data:
         preprocessed_data[name] = {
-            metabolite: np.pad(data, (0, max_length - len(data)), mode='constant', constant_values=np.nan)
+            metabolite: np.pad(
+                data,
+                (0, max_length - len(data)),
+                mode="constant",
+                constant_values=np.nan,
+            )
             for metabolite, data in preprocessed_data[name].items()
         }
 
     return preprocessed_data, max_length
-
-
-
 
 
 def posthoc_scheffe(a: np.ndarray) -> np.ndarray:
@@ -153,6 +157,7 @@ def scheffe_test(groups_split, metabolite_names):
     )
 
     return p_values_df
+
 
 # def scheffe_test(groups_split, metabolite_names):
 #     """
@@ -239,7 +244,7 @@ def posthoc_dunn(a: np.ndarray) -> np.ndarray:
     Returns:
         p_values (np.ndarray): An array of shape (k, k) containing the p-values.
     """
-    k = a.shape[1]
+    # k = a.shape[1]
     ranks = ss.rankdata(np.ma.masked_invalid(a).compressed())
 
     ranks_array = np.full(a.shape, np.nan)
@@ -252,7 +257,11 @@ def posthoc_dunn(a: np.ndarray) -> np.ndarray:
     c_ties = tie_sum / (12.0 * (np.sum(~np.isnan(a)) - 1)) if tie_sum else 0
 
     group_counts = np.sum(~np.isnan(a), axis=0)
-    denom = np.sqrt((np.sum(~np.isnan(a)) * (np.sum(~np.isnan(a)) + 1) - c_ties) / 12.0 * (1 / group_counts[:, None] + 1 / group_counts))
+    denom = np.sqrt(
+        (np.sum(~np.isnan(a)) * (np.sum(~np.isnan(a)) + 1) - c_ties)
+        / 12.0
+        * (1 / group_counts[:, None] + 1 / group_counts)
+    )
     z_values = np.abs(group_means[:, None] - group_means) / denom
     np.fill_diagonal(z_values, 0)
 
@@ -315,22 +324,28 @@ def posthoc_gameshowell(a: np.ndarray) -> np.ndarray:
     Returns:
         p_values (np.ndarray): An array of shape (k, k) containing the p-values.
     """
-    k = a.shape[1]
+    # k = a.shape[1]
 
     group_means = np.nanmean(a, axis=0)
     group_vars = np.nanvar(a, axis=0, ddof=1)
     group_counts = np.sum(~np.isnan(a), axis=0)
 
     mean_diffs = group_means[:, np.newaxis] - group_means
-    var_diffs = group_vars[:, np.newaxis] / group_counts[:, np.newaxis] + group_vars / group_counts
+    var_diffs = (
+        group_vars[:, np.newaxis] / group_counts[:, np.newaxis]
+        + group_vars / group_counts
+    )
     denom = np.sqrt(var_diffs)
 
     q_values = mean_diffs / denom
     np.fill_diagonal(q_values, 0)
 
     # Calculate Welch's degrees of freedom
-    df = var_diffs ** 2 / ((group_vars[:, np.newaxis] / group_counts[:, np.newaxis]) ** 2 / (group_counts[:, np.newaxis] - 1) +
-                           (group_vars / group_counts) ** 2 / (group_counts - 1))
+    df = var_diffs**2 / (
+        (group_vars[:, np.newaxis] / group_counts[:, np.newaxis]) ** 2
+        / (group_counts[:, np.newaxis] - 1)
+        + (group_vars / group_counts) ** 2 / (group_counts - 1)
+    )
 
     p_values = 2 * ss.t.sf(np.abs(q_values), df)
     np.fill_diagonal(p_values, 1)

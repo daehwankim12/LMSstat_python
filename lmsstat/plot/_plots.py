@@ -1,27 +1,29 @@
+import os
+
 import altair as alt
 import pandas as pd
-import os
 
 from ..stats import scaling
 
 
 def plot_pca(pc_scores, group):
-    pc_scores['Group'] = group
-    points = alt.Chart(pc_scores).mark_circle(size=60).encode(
-        x='PC1:Q',
-        y='PC2:Q',
-        color='Group:N',
-        tooltip=['Group:N', 'PC1:Q', 'PC2:Q']
+    pc_scores["Group"] = group
+    points = (
+        alt.Chart(pc_scores)
+        .mark_circle(size=60)
+        .encode(
+            x="PC1:Q", y="PC2:Q", color="Group:N", tooltip=["Group:N", "PC1:Q", "PC2:Q"]
+        )
     )
 
     return points
 
 
 def plot_one_box(metabolite):
-    box = alt.Chart(metabolite).mark_boxplot().encode(
-        x='Group:N',
-        y='Value:Q',
-        color='Group:N'
+    box = (
+        alt.Chart(metabolite)
+        .mark_boxplot()
+        .encode(x="Group:N", y="Value:Q", color="Group:N")
     )
 
     return box
@@ -47,14 +49,14 @@ def plot_box(data, scale=False, scale_method="auto"):
 
 
 def plot_one_dot(metabolite):
-    dot = alt.Chart(metabolite).mark_circle(size=60).encode(
-        x='Group:N',
-        y='Value:Q',
-        color='Group:N',
-        xOffset="jitter:Q"
-    ).transform_calculate(
-        # Generate Gaussian jitter with a Box-Muller transform
-        jitter="sqrt(-2*log(random()))*cos(2*PI*random())"
+    dot = (
+        alt.Chart(metabolite)
+        .mark_circle(size=60)
+        .encode(x="Group:N", y="Value:Q", color="Group:N", xOffset="jitter:Q")
+        .transform_calculate(
+            # Generate Gaussian jitter with a Box-Muller transform
+            jitter="sqrt(-2*log(random()))*cos(2*PI*random())"
+        )
     )
 
     return dot
@@ -127,11 +129,12 @@ def plot_dot(data, scale=False, scale_method="auto"):
 #
 #     return None
 
+
 # TODO: remove the following function
 def melting(data):
     data = data.set_index("Sample")
     data = data.melt(var_name="variable", value_name="value")
-    
+
     return data
 
 
@@ -142,10 +145,10 @@ def plot_heatmap(data, scale=False, scale_method="auto"):
     data = data.rename(columns={data.columns[0]: "Sample", data.columns[1]: "Group"})
     data = melting(data)
 
-    heatmap = alt.Chart(data).mark_rect().encode(
-        x='variable:N',
-        y='Sample:N',
-        color='value:Q'
+    heatmap = (
+        alt.Chart(data)
+        .mark_rect()
+        .encode(x="variable:N", y="Sample:N", color="value:Q")
     )
     heatmap.save("heatmap.png")
 

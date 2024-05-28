@@ -3,7 +3,8 @@ import pandas as pd
 from scipy.stats import false_discovery_control
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import KFold
+
+# from sklearn.model_selection import KFold
 
 
 def preprocess_data(data):
@@ -55,10 +56,14 @@ def scaling(data, method="auto"):
 
     if method == "auto":
         scaler.scale_ = np.std(scaled_data, axis=0, ddof=1).to_list()
-        scaled_data = pd.DataFrame(scaler.transform(scaled_data), columns=scaled_data.columns)
+        scaled_data = pd.DataFrame(
+            scaler.transform(scaled_data), columns=scaled_data.columns
+        )
     elif method == "pareto":
         scaler.scale_ = np.sqrt(np.std(scaled_data, axis=0, ddof=1)).to_list()
-        scaled_data = pd.DataFrame(scaler.transform(scaled_data), columns=scaled_data.columns)
+        scaled_data = pd.DataFrame(
+            scaler.transform(scaled_data), columns=scaled_data.columns
+        )
     else:
         print("Invalid scaling method.")
 
@@ -75,9 +80,14 @@ def pca(data, n_components=2, scale=True):
 
     pc = PCA(n_components=n_components)
     pc.fit(data_raw)
-    pc_scores = pd.DataFrame(pc.transform(data_raw), columns=[f"PC{i + 1}" for i in range(n_components)])
-    pc_loadings = pd.DataFrame(pc.components_.T, index=data_raw.columns,
-                               columns=[f"PC{i + 1}" for i in range(n_components)])
+    pc_scores = pd.DataFrame(
+        pc.transform(data_raw), columns=[f"PC{i + 1}" for i in range(n_components)]
+    )
+    pc_loadings = pd.DataFrame(
+        pc.components_.T,
+        index=data_raw.columns,
+        columns=[f"PC{i + 1}" for i in range(n_components)],
+    )
     pc_r2 = pc.explained_variance_ratio_.sum()
 
     # TODO: Q2 implementation

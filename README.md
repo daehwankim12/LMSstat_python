@@ -1,4 +1,4 @@
-# LMSstat_python: Python implementation of LMSstat (https://github.com/daehwankim12/LMSstat)
+# LMSstat_python: Python implementation of LMSstat (<https://github.com/daehwankim12/LMSstat>)
 
 ## Installation
 

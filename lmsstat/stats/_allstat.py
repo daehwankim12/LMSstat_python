@@ -1,9 +1,10 @@
-from ._tests import t_test, u_test, anova_test, kruskal_test
-from ._posthoc import scheffe_test, dunn_test, games_howell_test
-from ._utils import preprocess_data, p_adjust
-
 import os
+
 import pandas as pd
+
+from ._posthoc import dunn_test, games_howell_test  # scheffe_test
+from ._tests import anova_test, kruskal_test, t_test, u_test
+from ._utils import p_adjust, preprocess_data
 
 
 def allstats(filedir, p_adj=True):
@@ -45,9 +46,9 @@ def allstats(filedir, p_adj=True):
             result_anova = p_adjust(result_anova)
             result_kruskal = p_adjust(result_kruskal)
     if num_groups == 2:
-        result = pd.concat([result_t, result_u], axis=1)
+        return pd.concat([result_t, result_u], axis=1)
     else:
-        result = pd.concat(
+        return pd.concat(
             [
                 result_t,
                 result_u,
@@ -59,5 +60,3 @@ def allstats(filedir, p_adj=True):
             ],
             axis=1,
         )
-
-    return result

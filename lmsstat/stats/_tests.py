@@ -1,4 +1,5 @@
 import itertools
+
 import numpy as np
 import pandas as pd
 import scipy.stats as ss
@@ -96,18 +97,23 @@ def anova_test(groups_split, metabolite_names) -> pd.DataFrame:
     Returns:
         anova_results (pandas.core.frame.DataFrame): A DataFrame containing the p-value for each metabolite.
     """
-    group_data = {name: group.dropna(subset=metabolite_names).drop(columns=["Sample"]) for name, group in groups_split}
+    group_data = {
+        name: group.dropna(subset=metabolite_names).drop(columns=["Sample"])
+        for name, group in groups_split
+    }
     merged_data = pd.concat(group_data.values(), ignore_index=True)
     group = merged_data.pop("Group").values
 
     metabolite_data = merged_data[metabolite_names].values
     anova_results = np.zeros(len(metabolite_names))
 
-    for i, metabolite in enumerate(metabolite_names):
+    for i, _metabolite in enumerate(metabolite_names):
         anova_result = anova_oneway(metabolite_data[:, i], group, welch_correction=True)
         anova_results[i] = anova_result.pvalue
 
-    anova_results = pd.DataFrame({"p-value_ANOVA": anova_results}, index=metabolite_names)
+    anova_results = pd.DataFrame(
+        {"p-value_ANOVA": anova_results}, index=metabolite_names
+    )
     return anova_results
 
 

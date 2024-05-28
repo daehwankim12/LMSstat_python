@@ -19,8 +19,10 @@ def allstats(filedir, p_adj=True):
     Returns:
         pandas.DataFrame: The statistical analysis results.
     """
-    assert isinstance(filedir, str)
-    assert os.path.isfile(filedir)
+    if not isinstance(filedir, str):
+        raise TypeError("filedir must be a string")
+    if not os.path.isfile(filedir):
+        raise FileNotFoundError("The file does not exist")
 
     data = pd.read_csv(filedir)
 
@@ -28,7 +30,8 @@ def allstats(filedir, p_adj=True):
 
     num_groups = len(groups_split)
 
-    assert num_groups > 1, "Number of groups must be greater than 1"
+    if num_groups <= 1:
+        raise ValueError("Number of groups must be greater than 1")
 
     result_t = t_test(groups_split, metabolite_names)
     result_u = u_test(groups_split, metabolite_names)

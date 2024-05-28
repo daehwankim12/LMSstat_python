@@ -37,8 +37,7 @@ def plot_box(data, scale=False, scale_method="auto"):
     group = data["Group"]
     data = data.drop(columns=["Sample", "Group"])
 
-    if not os.path.exists("boxplots"):
-        os.makedirs("boxplots", exist_ok=True)
+    os.makedirs("boxplots", exist_ok=True)
 
     for metabolite in data.columns:
         one_data = pd.DataFrame({"Group": group, "Value": data[metabolite]})
@@ -70,8 +69,7 @@ def plot_dot(data, scale=False, scale_method="auto"):
     group = data["Group"]
     data = data.drop(columns=["Sample", "Group"])
 
-    if not os.path.exists("dotplots"):
-        os.makedirs("dotplots", exist_ok=True)
+    os.makedirs("dotplots", exist_ok=True)
 
     for metabolite in data.columns:
         one_data = pd.DataFrame({"Group": group, "Value": data[metabolite]})

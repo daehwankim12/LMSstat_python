@@ -49,7 +49,7 @@ def correlation(data, axis="sample"):
 
 def scaling(data, method="auto"):
     data = data.rename(columns={data.columns[0]: "Sample", data.columns[1]: "Group"})
-    data_raw = data.drop(columns=["Sample", "Group"])
+    data_raw = data.iloc[:, 2:]
     scaled_data = data_raw.copy()
     scaler = StandardScaler()
     scaler.fit(scaled_data)
@@ -65,11 +65,10 @@ def scaling(data, method="auto"):
             scaler.transform(scaled_data), columns=scaled_data.columns
         )
     else:
-        print("Invalid scaling method.")
+        raise ValueError("Invalid scaling method.")
 
-    result = pd.concat([data[["Sample", "Group"]], scaled_data], axis=1)
 
-    return result
+    return pd.concat([data[["Sample", "Group"]], scaled_data], axis=1)
 
 
 def pca(data, n_components=2, scale=True):

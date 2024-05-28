@@ -106,12 +106,12 @@ def posthoc_scheffe(a: np.ndarray) -> np.ndarray:
 
     sin = np.sum((group_counts - 1) * group_vars) / (n - k)
 
-    a = sin * (1.0 / group_counts[:, None] + 1.0 / group_counts) * (k - 1)
+    pooled_variance = sin * (1.0 / group_counts[:, None] + 1.0 / group_counts) * (k - 1)
 
     dif = group_means[:, None] - group_means
     msd = dif**2
 
-    f_val = np.divide(msd, a, out=np.zeros_like(msd), where=a != 0)
+    f_val = np.divide(msd, pooled_variance, out=np.zeros_like(msd), where=pooled_variance != 0)
 
     p_values = ss.f.sf(f_val, k - 1, n - k)
     np.fill_diagonal(p_values, 1)

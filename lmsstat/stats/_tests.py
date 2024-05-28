@@ -134,7 +134,6 @@ def kruskal_test(groups_split, metabolite_names) -> pd.DataFrame:
     }
 
     # Prepare the DataFrame structure outside the loop
-    kw_results = pd.DataFrame(index=metabolite_names, columns=["p-value_KW"])
     kw_results = np.zeros(len(metabolite_names))
     # Iterate over metabolites only once
     for i, metabolite in enumerate(metabolite_names):

@@ -10,41 +10,41 @@ import pandas as pd
 import scipy.stats as ss
 from scipy.stats import false_discovery_control
 
-def preprocess_groups(groups_split):
-    """
-    Preprocesses groups_split by padding the data with NaNs to make all groups the same length.
-
-    Args:
-        groups_split (pandas.core.groupby.DataFrameGroupBy): A pandas DataFrameGroupBy object.
-
-    Returns:
-        tuple: A tuple containing:
-            - preprocessed_data (dict): A dictionary containing preprocessed data for each group.
-            - max_length (int): The maximum length of all groups after padding with NaNs.
-    """
-    max_length = max(len(group) for name, group in groups_split)
-
-    preprocessed_data = {}
-    for name, group in groups_split:
-        group_data = {
-            metabolite: group[metabolite].dropna().values for metabolite in group
-        }
-
-        padding_sizes = {
-            metabolite: max_length - len(data)
-            for metabolite, data in group_data.items()
-        }
-
-        preprocessed_data[name] = {
-            metabolite: np.pad(
-                data, (0, padding_size), "constant", constant_values=np.nan
-            )
-            for metabolite, data, padding_size in zip(
-                group_data.keys(), group_data.values(), padding_sizes.values()
-            )
-        }
-
-    return preprocessed_data, max_length
+# def preprocess_groups(groups_split):
+#     """
+#     Preprocesses groups_split by padding the data with NaNs to make all groups the same length.
+#
+#     Args:
+#         groups_split (pandas.core.groupby.DataFrameGroupBy): A pandas DataFrameGroupBy object.
+#
+#     Returns:
+#         tuple: A tuple containing:
+#             - preprocessed_data (dict): A dictionary containing preprocessed data for each group.
+#             - max_length (int): The maximum length of all groups after padding with NaNs.
+#     """
+#     max_length = max(len(group) for name, group in groups_split)
+#
+#     preprocessed_data = {}
+#     for name, group in groups_split:
+#         group_data = {
+#             metabolite: group[metabolite].dropna().values for metabolite in group
+#         }
+#
+#         padding_sizes = {
+#             metabolite: max_length - len(data)
+#             for metabolite, data in group_data.items()
+#         }
+#
+#         preprocessed_data[name] = {
+#             metabolite: np.pad(
+#                 data, (0, padding_size), "constant", constant_values=np.nan
+#             )
+#             for metabolite, data, padding_size in zip(
+#                 group_data.keys(), group_data.values(), padding_sizes.values()
+#             )
+#         }
+#
+#     return preprocessed_data, max_length
 
 
 # def preprocess_groups(groups_split):
@@ -85,6 +85,42 @@ def preprocess_groups(groups_split):
 #         }
 #
 #     return preprocessed_data, max_length
+def preprocess_groups(groups_split):
+    """
+    Preprocesses groups_split by padding the data with NaNs to make all groups the same length.
+    Optimized version.
+
+    Args:
+        groups_split (pandas.core.groupby.DataFrameGroupBy): A pandas DataFrameGroupBy object.
+
+    Returns:
+        tuple: A tuple containing:
+            - preprocessed_data (dict): A dictionary containing preprocessed data for each group.
+            - max_length (int): The maximum length of all groups after padding with NaNs.
+    """
+    # Calculate the maximum length and preprocess the data in a single pass
+    preprocessed_data = {}
+    max_length = 0
+    for name, group in groups_split:
+        group_data = {
+            metabolite: group[metabolite].dropna().to_numpy() for metabolite in group
+        }
+        current_max = max(len(data) for data in group_data.values())
+        max_length = max(max_length, current_max)
+
+        preprocessed_data[name] = group_data
+
+    # Pad the data with NaNs
+    for name in preprocessed_data:
+        preprocessed_data[name] = {
+            metabolite: np.concatenate([
+                data,
+                np.full(max_length - len(data), np.nan)
+            ])
+            for metabolite, data in preprocessed_data[name].items()
+        }
+
+    return preprocessed_data, max_length
 
 
 def posthoc_scheffe(a: np.ndarray) -> np.ndarray:

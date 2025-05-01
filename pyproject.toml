@@ -13,7 +13,7 @@ dependencies = [
   "jupyter",
   "numpy",
   "pandas",
-  "scipy",
+  "scipy >= 1.9.0",
   "statsmodels",
   "scikit-learn",
   "altair",

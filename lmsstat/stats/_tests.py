@@ -54,6 +54,26 @@ def t_test(groups_split, metabolite_names) -> pd.DataFrame:
 
     return df_ttest
 
+def _decide_utest_method(groups_split, metabolite_names) -> str:
+    """
+    Decide once-and-for-all whether *all* U-tests will be ‘exact’
+    or ‘asymptotic’.
+
+    Rule (agreed with domain experts):
+        • exact  ‑ if the largest group has THRESHOLD (<= 10) samples
+                   AND there is absolutely no tie in any metabolite column
+        • otherwise asymptotic
+    """
+    # 1) largest group size
+    max_n = groups_split.size().max()
+
+    # 2) any ties?
+    df_all = groups_split.obj[metabolite_names].select_dtypes("number")
+    has_ties = df_all.apply(lambda col: col.duplicated().any()).any()
+
+    method = "exact" if (max_n <= 10 and not has_ties) else "asymptotic"
+
+    return method
 
 def u_test(groups_split, metabolite_names) -> pd.DataFrame:
     """
@@ -86,6 +106,8 @@ def u_test(groups_split, metabolite_names) -> pd.DataFrame:
 
     u_test_results = {}
 
+    test_method = _decide_utest_method(groups_split, metabolite_names)
+
     for group_a, group_b in group_combinations:
         mat_a = numeric_data_groups[group_a]
         mat_b = numeric_data_groups[group_b]
@@ -93,6 +115,7 @@ def u_test(groups_split, metabolite_names) -> pd.DataFrame:
                                       use_continuity=True,
                                       alternative='two-sided',
                                       axis=0,
+                                      method = test_method,
                                       nan_policy='omit')
 
         col_name = f"({group_a}, {group_b})_utest"

@@ -1,8 +1,9 @@
 import numpy as np
 import pandas as pd
 from scipy.stats import false_discovery_control
-from sklearn.decomposition import PCA
+
 from sklearn.preprocessing import StandardScaler
+
 
 # from sklearn.model_selection import KFold
 
@@ -45,6 +46,8 @@ def correlation(data, axis="sample"):
         return data.corr()
     elif axis == "metabolite":
         return data.transpose().corr()
+    else:
+        raise ValueError("Invalid axis. Use 'sample' or 'metabolite'.")
 
 
 def scaling(data, method="auto"):
@@ -67,29 +70,4 @@ def scaling(data, method="auto"):
     else:
         raise ValueError("Invalid scaling method.")
 
-
     return pd.concat([data[["Sample", "Group"]], scaled_data], axis=1)
-
-
-def pca(data, n_components=2, scale=True):
-    if scale:
-        data = scaling(data, method="auto")
-    data = data.rename(columns={data.columns[0]: "Sample", data.columns[1]: "Group"})
-    data_raw = data.drop(columns=["Sample", "Group"])
-
-    pc = PCA(n_components=n_components)
-    pc.fit(data_raw)
-    pc_scores = pd.DataFrame(
-        pc.transform(data_raw), columns=[f"PC{i + 1}" for i in range(n_components)]
-    )
-    pc_loadings = pd.DataFrame(
-        pc.components_.T,
-        index=data_raw.columns,
-        columns=[f"PC{i + 1}" for i in range(n_components)],
-    )
-    pc_r2 = pc.explained_variance_ratio_.sum()
-
-    # TODO: Q2 implementation
-    # cv = KFold(n_splits=7, shuffle=True, random_state=42)
-
-    return pc_scores, pc_loadings, pc_r2  # , pc_q2

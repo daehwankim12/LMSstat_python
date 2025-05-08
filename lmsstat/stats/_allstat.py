@@ -1,31 +1,22 @@
-import os
-
 import pandas as pd
 
-from ._posthoc import dunn_test, games_howell_test, scheffe_test
+from ._posthoc import dunn_test, scheffe_test
 from ._tests import anova_test, kruskal_test, t_test, u_test
 from ._utils import p_adjust, preprocess_data
 
 
-def allstats(filedir, p_adj=True):
+def allstats(data, p_adj=True):
     """
     Generates a statistical analysis of the given file.
 
     Parameters:
-        filedir (str): The directory of the file to be analyzed.
+        data (str): Data to be analyzed.
 
-        p_adj (bool, optional): Whether to perform p-value adjustment. Defaults to True.
+        P_adj (bool, optional): Whether to perform p-value adjustment. Defaults to True.
 
     Returns:
         pandas.DataFrame: The statistical analysis results.
     """
-    if not isinstance(filedir, str):
-        raise TypeError("filedir must be a string")
-    if not os.path.isfile(filedir):
-        raise FileNotFoundError("The file does not exist")
-
-    data = pd.read_csv(filedir)
-
     _, groups_split, metabolite_names = preprocess_data(data)
 
     num_groups = len(groups_split)
@@ -38,7 +29,6 @@ def allstats(filedir, p_adj=True):
     if num_groups > 2:
         result_anova = anova_test(groups_split, metabolite_names)
         result_kruskal = kruskal_test(groups_split, metabolite_names)
-        # result_games = games_howell_test(groups_split, metabolite_names)
         result_scheffe = scheffe_test(groups_split, metabolite_names)
         result_dunn = dunn_test(groups_split, metabolite_names)
 
@@ -56,7 +46,6 @@ def allstats(filedir, p_adj=True):
                 result_t,
                 result_u,
                 result_anova,
-                # result_games,
                 result_scheffe,
                 result_kruskal,
                 result_dunn,

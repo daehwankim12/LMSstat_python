@@ -54,6 +54,7 @@ def t_test(groups_split, metabolite_names) -> pd.DataFrame:
 
     return df_ttest
 
+
 def _decide_utest_method(groups_split, metabolite_names) -> str:
     """
     Decide once-and-for-all whether *all* U-tests will be ‘exact’
@@ -74,6 +75,7 @@ def _decide_utest_method(groups_split, metabolite_names) -> str:
     method = "exact" if (max_n <= 10 and not has_ties) else "asymptotic"
 
     return method
+
 
 def u_test(groups_split, metabolite_names) -> pd.DataFrame:
     """
@@ -115,7 +117,7 @@ def u_test(groups_split, metabolite_names) -> pd.DataFrame:
                                       use_continuity=True,
                                       alternative='two-sided',
                                       axis=0,
-                                      method = test_method,
+                                      method=test_method,
                                       nan_policy='omit')
 
         col_name = f"({group_a}, {group_b})_utest"

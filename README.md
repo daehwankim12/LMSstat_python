@@ -3,7 +3,7 @@
 ## Installation
 
 ```bash
-pip install git+https://github.com/daehwankim12/LMSstat_python.git@develop
+pip install lmsstat
 ```
 
 ## Usage
@@ -11,12 +11,12 @@ pip install git+https://github.com/daehwankim12/LMSstat_python.git@develop
 ### t-test, u-test, ANOVA, and Kruskal-Wallis test
 
 ```python
-from lmsstat import stats
+from lmsstat import stat
 import pandas as pd
 
 data = pd.read_csv("data.csv")
-result = stats.allstats(data)
-# result = stats.allstats(data, p_adj=False) # When you don't want to adjust p-value
+result = stat.allstats(data)
+# result = stat.allstats(data, p_adj=False) # When you don't want to adjust p-value
 
 result.to_csv('result.csv', index=False)  # Save the result as a csv file
 ```
@@ -26,13 +26,13 @@ result.to_csv('result.csv', index=False)  # Save the result as a csv file
 보정되지 않은 결과이므로 주의.
 
 ```python
-from lmsstat import stats
+from lmsstat import stat
 import pandas as pd
 
 path = "data.csv"
 data = pd.read_csv(path)
 
-result = stats.norm_test(data)
+result = stat.norm_test(data)
 result
 ```
 
@@ -40,11 +40,11 @@ result
 
 ```python
 import pandas as pd
-from lmsstat import stats
+from lmsstat import stat
 
 path = "data.csv"
 data = pd.read_csv(path)
-scaled_data = stats.scaling(data)
+scaled_data = stat.scaling(data)
 scaled_data.to_csv("scaled_data.csv")
 
 scaled_data
@@ -80,12 +80,12 @@ print(f"R2X: {plsda_plt[1]}, R2Y: {plsda_plt[2]}, Q2: {plsda_plt[3]}")  # R2, Q2
 각각 현재 작업 디렉토리 밑에 만들어진 boxplot, barplot 폴더에 자동으로 저장됨.
 
 ```python
-from lmsstat import plot, stats
+from lmsstat import plot, stat
 import pandas as pd
 
 data = pd.read_csv("data.csv")
 
-stats_res = stats.allstats(data)
+stats_res = stat.allstats(data)
 
 plot.plot_box(data, stats_res, test_type="t-test")
 plot.plot_bar(data, stats_res, test_type="t-test")

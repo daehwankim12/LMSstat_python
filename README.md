@@ -3,7 +3,7 @@
 ## Installation
 
 ```bash
-pip install git+https://github.com/daehwankim12/LMSstat_python.git@develop
+pip install git+https://github.com/daehwankim12/LMSstat_python.git
 ```
 
 ## Usage

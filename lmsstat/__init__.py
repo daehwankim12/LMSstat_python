@@ -10,5 +10,5 @@ Using any of these subpackages requires an explicit import. For example,
 ::
 
  plot   --- Plotting Functions
- stats  --- Statistical Functions
+ stat  --- Statistical Functions
 """

@@ -9,7 +9,7 @@ from sklearn.model_selection import KFold
 from sklearn.preprocessing import StandardScaler
 
 
-def scaling(data: pd.DataFrame, *, method: str = "auto") -> pd.DataFrame:
+def scaling(data: pd.DataFrame, method: str = "auto") -> pd.DataFrame:
     """
     Scale the numeric columns in a tidy-format DataFrame.
 

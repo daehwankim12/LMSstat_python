@@ -41,11 +41,13 @@ def p_adjust(mat):
     )
 
 
-def correlation(data, axis="sample"):
+def correlation(data, axis="sample", method="pearson"):
+    data = data.iloc[:, 2:]
+    axis = axis.lower()
     if axis == "sample":
-        return data.corr()
+        return data.transpose().corr(method=method)
     elif axis == "metabolite":
-        return data.transpose().corr()
+        return data.corr(method=method)
     else:
         raise ValueError("Invalid axis. Use 'sample' or 'metabolite'.")
 
@@ -58,7 +60,7 @@ def scaling(data, method="auto"):
     scaler.fit(scaled_data)
 
     if method == "auto":
-        scaler.scale_ = np.std(scaled_data, axis=0, ddof=1).to_list()
+        scaler.scale_ = np.std(scaled_data, axis=1, ddof=1).to_list()
         scaled_data = pd.DataFrame(
             scaler.transform(scaled_data), columns=scaled_data.columns
         )

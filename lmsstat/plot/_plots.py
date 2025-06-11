@@ -173,6 +173,8 @@ def _plot_multi(
             "test_type must be 't-test', 'u-test', 'scheffe', or 'dunn'."
         )
 
+    data["Group"] = data["Group"].astype(str)
+
     # match the exact column name pattern in stats_res
     if test_type.lower() == "t-test":
         test_type = "ttest"

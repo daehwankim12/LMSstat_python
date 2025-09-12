@@ -41,11 +41,13 @@ def p_adjust(mat):
     )
 
 
-def correlation(data, axis="sample"):
+def correlation(data, axis="sample", method="pearson"):
+    data = data.iloc[:, 2:]
+    axis = axis.lower()
     if axis == "sample":
-        return data.corr()
+        return data.transpose().corr(method=method)
     elif axis == "metabolite":
-        return data.transpose().corr()
+        return data.corr(method=method)
     else:
         raise ValueError("Invalid axis. Use 'sample' or 'metabolite'.")
 

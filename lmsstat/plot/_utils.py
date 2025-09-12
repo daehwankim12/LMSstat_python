@@ -5,156 +5,9 @@ from matplotlib.pyplot import colormaps
 from plotnine import geom_segment, aes, annotate
 from sklearn.cross_decomposition import PLSRegression
 from sklearn.decomposition import PCA
-from sklearn.model_selection import KFold
-from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import KFold, GroupKFold
 
-
-def scaling(data: pd.DataFrame, *, method: str = "auto") -> pd.DataFrame:
-    """
-    Scale the numeric columns in a tidy-format DataFrame.
-
-    Parameters
-    ----------
-    data : DataFrame
-        First column = Sample, second column = Group, remaining = numeric variables.
-    method : {"auto", "pareto"}
-        auto   -> unit variance (z-score) scaling
-        pareto -> sqrt-SD scaling
-
-    Returns
-    -------
-    DataFrame
-        Same structure but scaled numeric values.
-    """
-    if method not in ("auto", "pareto"):
-        raise ValueError("Invalid scaling method: choose 'auto' or 'pareto'.")
-
-    data = data.rename(columns={data.columns[0]: "Sample",
-                                data.columns[1]: "Group"})
-    data_raw = data.iloc[:, 2:]
-    scaled_data = data_raw.copy()
-
-    scaler = StandardScaler()
-    scaler.fit(scaled_data)
-
-    if method == "auto":
-        scaler.scale_ = np.std(scaled_data, axis=0, ddof=1).to_list()
-        scaled_data = pd.DataFrame(
-            scaler.transform(scaled_data), columns=scaled_data.columns
-        )
-    elif method == "pareto":
-        scaler.scale_ = np.sqrt(np.std(scaled_data, axis=0, ddof=1)).to_list()
-        scaled_data = pd.DataFrame(
-            scaler.transform(scaled_data), columns=scaled_data.columns
-        )
-
-    return pd.concat([data[["Sample", "Group"]], scaled_data], axis=1)
-
-
-def pca(data: pd.DataFrame,
-        n_components: int = 2,
-        scale: bool = True,
-        cv_splits: int = 7,
-        random_state: int = 42):
-    """
-    Perform PCA and calculate cumulative Q² via cross-validation.
-
-    Parameters
-    ----------
-    data : DataFrame
-        First column = Sample, second = Group, remaining = numeric variables.
-    n_components : int
-        Number of principal components to keep.
-    scale : bool
-        If True, apply auto-scaling before PCA.
-    cv_splits : int
-        Number of folds for K-fold CV (between 2 and n_samples).
-    random_state : int
-        RNG seed for reproducibility.
-
-    Returns
-    -------
-    pc_scores : DataFrame
-        Sample scores for each component.
-    pc_loadings : DataFrame
-        Variable loadings for each component.
-    pc_r2 : float
-        Cumulative variance explained (R²X).
-    pc_q2 : float
-        Cumulative predictive ability (Q²) from CV.
-    """
-    # --- Pre-processing --------------------------------------------------
-    if scale:
-        data = scaling(data, method="auto")
-
-    data = data.rename(columns={data.columns[0]: "Sample",
-                                data.columns[1]: "Group"})
-    X_df = data.drop(columns=["Sample", "Group"])
-    X = X_df.to_numpy(float)
-
-    # --- Fit PCA on the full data ---------------------------------------
-    pc = PCA(n_components=n_components).fit(X)
-
-    pc_cols = [f"PC{i + 1}" for i in range(n_components)]
-    pc_scores = pd.DataFrame(pc.transform(X), columns=pc_cols)
-    pc_loadings = pd.DataFrame(pc.components_.T,
-                               index=X_df.columns,
-                               columns=pc_cols)
-    pc_r2 = pc.explained_variance_ratio_.sum()
-
-    # --- Cross-validation for Q² ----------------------------------------
-    n_samples = X.shape[0]
-    cv_splits = min(max(2, cv_splits), n_samples)
-    kf = KFold(n_splits=cv_splits, shuffle=True, random_state=random_state)
-
-    press_contrib = np.zeros(n_components)
-    ss_contrib = np.zeros(n_components)
-
-    for tr_idx, te_idx in kf.split(X):
-        X_tr, X_te = X[tr_idx], X[te_idx]
-
-        # Center data within the fold
-        mu_fold = X_tr.mean(axis=0)
-        R_tr = X_tr - mu_fold
-        R_te = X_te - mu_fold
-
-        for a in range(n_components):
-            # Total sum of squares before extracting component a
-            ss_now = np.sum(R_te ** 2)
-            ss_contrib[a] += ss_now
-            if np.isclose(ss_now, 0.0):
-                R_tr.fill(0.0)
-                R_te.fill(0.0)
-                break
-
-            # One-component PCA on training residuals
-            if np.isclose(np.sum(R_tr ** 2), 0.0):
-                P_a = np.zeros((1, R_tr.shape[1]))
-            else:
-                pca_one = PCA(n_components=1, random_state=random_state).fit(R_tr)
-                P_a = pca_one.components_
-
-            # Project test residuals and compute PRESS
-            T_te = R_te @ P_a.T
-            R_te_hat = T_te @ P_a
-            press_contrib[a] += np.sum((R_te - R_te_hat) ** 2)
-
-            # Deflate residuals for next component
-            T_tr = R_tr @ P_a.T
-            R_tr -= T_tr @ P_a
-            R_te -= R_te_hat
-
-    # --- Aggregate Q² ----------------------------------------------------
-    ratios = []
-    for a in range(n_components):
-        ss_a = ss_contrib[a]
-        pr_a = press_contrib[a]
-        ratio = 1.0 if np.isclose(ss_a, 0.0) else pr_a / ss_a
-        ratio = max(ratio, -0.1)
-        ratios.append(ratio)
-
-    pc_q2 = 1.0 - np.prod(ratios)
-    return pc_scores, pc_loadings, pc_r2, pc_q2
+from ..stat._utils import scaling
 
 
 def _pal(n: int):
@@ -166,16 +19,8 @@ def _pal(n: int):
 
 
 # ───────── Bracket + Star annotation helper ─────────
-def _annot(gg,
-           stat_tbl: pd.DataFrame,
-           order: list[str],
-           y_top: float,
-           *,
-           offset: float = 0.05,
-           step: float = 0.05,
-           tip: float = 0.01,
-           star: int = 10,
-           line: float = 0.15):
+def _annot(gg, stat_tbl: pd.DataFrame, order: list[str], y_top: float, *, offset: float = 0.05, step: float = 0.05,
+           tip: float = 0.01, star: int = 10, line: float = 0.15):
     """
     Add bracket-style significance annotations to a plotnine object.
 
@@ -214,13 +59,7 @@ def _annot(gg,
         gg += geom_segment(aes(x=x1, xend=x2, y=y, yend=y), size=line)
         gg += geom_segment(aes(x=x1, xend=x1, y=y, yend=y2), size=line)
         gg += geom_segment(aes(x=x2, xend=x2, y=y, yend=y2), size=line)
-        gg += annotate('text',
-                       x=(x1 + x2) / 2,
-                       y=y,
-                       label=s,
-                       size=star,
-                       ha='center',
-                       va='bottom')
+        gg += annotate('text', x=(x1 + x2) / 2, y=y, label=s, size=star, ha='center', va='bottom')
     return gg
 
 
@@ -232,67 +71,30 @@ def melting(data: pd.DataFrame) -> pd.DataFrame:
     return data.melt(var_name="variable", value_name="value")
 
 
-def plsda(data: pd.DataFrame,
-          n_components: int = 2,
-          scale: bool = True,
-          cv_splits: int = 7,
-          random_state: int = 42):
-    """
-    Perform PLS-DA and compute cumulative R²X, R²Y, Q².
+def simca_cv_groups(n_samples, cv_splits=7):
+    return np.arange(n_samples) % cv_splits
 
-    Parameters
-    ----------
-    data : DataFrame
-        First column = Sample, second = Group, remaining = numeric variables.
-    n_components : int
-        Number of latent variables.
-    scale : bool
-        If True, apply auto scaling before PLS-DA.
-    cv_splits : int
-        Number of CV folds (2 ≤ cv_splits ≤ n_samples).
-    random_state : int
-        RNG seed.
 
-    Returns
-    -------
-    lv_scores : DataFrame
-        Sample scores for latent variables.
-    lv_loadings : DataFrame
-        Variable loadings.
-    r2x_cum : float
-        Cumulative R²X.
-    r2y_cum : float
-        Cumulative R²Y.
-    q2_cum : float
-        Cumulative Q² from CV.
-    """
-    # --- Pre-processing --------------------------------------------------
+def plsda(data: pd.DataFrame, n_components: int = 2, scale: bool = True, cv_splits: int = 7, random_state: int = 42):
     if scale:
         data = scaling(data, "auto")
 
-    data = data.rename(columns={data.columns[0]: "Sample",
-                                data.columns[1]: "Group"})
+    data = data.rename(columns={data.columns[0]: "Sample", data.columns[1]: "Group"})
     X_df = data.drop(columns=["Sample", "Group"])
     X = X_df.to_numpy(float)
 
     y_labels = data["Group"].astype(str)
-    Y_df = pd.get_dummies(y_labels)  # one-hot encoding
+    Y_df = pd.get_dummies(y_labels)
     Y = Y_df.to_numpy(float)
 
-    # --- Fit PLS-DA on full data ----------------------------------------
-    pls = PLSRegression(n_components=n_components,
-                        scale=False,
-                        max_iter=200).fit(X, Y)
+    pls = PLSRegression(n_components=n_components, scale=False, max_iter=200).fit(X, Y)
 
     lv_cols = [f"LV{i + 1}" for i in range(n_components)]
     lv_scores = pd.DataFrame(pls.x_scores_, columns=lv_cols)
-    lv_loadings = pd.DataFrame(pls.x_loadings_,
-                               index=X_df.columns,
-                               columns=lv_cols)
+    lv_loadings = pd.DataFrame(pls.x_loadings_, index=X_df.columns, columns=lv_cols)
 
     r2y_cum = pls.score(X, Y)
 
-    # R²X based on reconstruction
     X_mean = pls._x_mean
     Xc = X - X_mean
     X_hat = pls.x_scores_ @ pls.x_loadings_.T
@@ -300,21 +102,20 @@ def plsda(data: pd.DataFrame,
     tss_x = np.sum(Xc ** 2)
     r2x_cum = 0.0 if np.isclose(tss_x, 0.0) else 1.0 - sse_x / tss_x
 
-    # --- Cross-validated Q² --------------------------------------------
     n_samples = X.shape[0]
     cv_splits = min(max(2, cv_splits), n_samples)
-    kf = KFold(n_splits=cv_splits, shuffle=True, random_state=random_state)
+    groups = simca_cv_groups(n_samples, cv_splits)
 
     press = np.zeros(n_components)
     ss = np.zeros(n_components)
 
-    for tr_idx, te_idx in kf.split(X):
+    for g in range(cv_splits):
+        te_idx = np.where(groups == g)[0]
+        tr_idx = np.where(groups != g)[0]
         X_tr, X_te = X[tr_idx], X[te_idx]
         Y_tr, Y_te = Y[tr_idx], Y[te_idx]
 
-        pls_fold = PLSRegression(n_components=n_components,
-                                 scale=False,
-                                 max_iter=200).fit(X_tr, Y_tr)
+        pls_fold = PLSRegression(n_components=n_components, scale=False, max_iter=200).fit(X_tr, Y_tr)
 
         W = pls_fold.x_weights_
         P = pls_fold.x_loadings_
@@ -344,4 +145,87 @@ def plsda(data: pd.DataFrame,
         ratios.append(r)
 
     q2_cum = 1.0 - np.prod(ratios)
-    return lv_scores, lv_loadings, r2x_cum, r2y_cum, q2_cum
+
+    p = X.shape[1]
+    W = pls.x_rotations_
+
+    r2_cum_list = []
+    for a in range(1, n_components + 1):
+        pls_a = PLSRegression(n_components=a, scale=False, max_iter=200).fit(X, Y)
+        r2_a = pls_a.score(X, Y)
+        r2_cum_list.append(r2_a)
+
+    r2_explained = [r2_cum_list[0]] + [r2_cum_list[a] - r2_cum_list[a - 1] for a in range(1, n_components)]
+    sum_r2_explained = sum(r2_explained)
+    vip_scores = np.zeros(p)
+    for j in range(p):
+        vip_j = np.sum((W[j, :] ** 2) * r2_explained)
+        vip_scores[j] = np.sqrt(p * vip_j / sum_r2_explained)
+    vip_df = pd.DataFrame(vip_scores, index=X_df.columns, columns=["VIP"])
+
+    return lv_scores, lv_loadings, r2x_cum, r2y_cum, q2_cum, vip_df
+
+
+def pca(data: pd.DataFrame, n_components: int = 2, scale: bool = True, cv_splits: int = 7, random_state: int = 42):
+    if scale:
+        data = scaling(data, method="auto")
+
+    data = data.rename(columns={data.columns[0]: "Sample", data.columns[1]: "Group"})
+    X_df = data.drop(columns=["Sample", "Group"])
+    X = X_df.to_numpy(float)
+
+    pc = PCA(n_components=n_components).fit(X)
+
+    pc_cols = [f"PC{i + 1}" for i in range(n_components)]
+    pc_scores = pd.DataFrame(pc.transform(X), columns=pc_cols)
+    pc_loadings = pd.DataFrame(pc.components_.T, index=X_df.columns, columns=pc_cols)
+    pc_r2 = pc.explained_variance_ratio_.sum()
+
+    n_samples = X.shape[0]
+    cv_splits = min(max(2, cv_splits), n_samples)
+    groups = simca_cv_groups(n_samples, cv_splits)
+
+    press_contrib = np.zeros(n_components)
+    ss_contrib = np.zeros(n_components)
+
+    for g in range(cv_splits):
+        te_idx = np.where(groups == g)[0]
+        tr_idx = np.where(groups != g)[0]
+        X_tr, X_te = X[tr_idx], X[te_idx]
+
+        mu_fold = X_tr.mean(axis=0)
+        R_tr = X_tr - mu_fold
+        R_te = X_te - mu_fold
+
+        for a in range(n_components):
+            ss_now = np.sum(R_te ** 2)
+            ss_contrib[a] += ss_now
+            if np.isclose(ss_now, 0.0):
+                R_tr.fill(0.0)
+                R_te.fill(0.0)
+                break
+
+            if np.isclose(np.sum(R_tr ** 2), 0.0):
+                P_a = np.zeros((1, R_tr.shape[1]))
+            else:
+                pca_one = PCA(n_components=1, random_state=random_state).fit(R_tr)
+                P_a = pca_one.components_
+
+            T_te = R_te @ P_a.T
+            R_te_hat = T_te @ P_a
+            press_contrib[a] += np.sum((R_te - R_te_hat) ** 2)
+
+            T_tr = R_tr @ P_a.T
+            R_tr -= T_tr @ P_a
+            R_te -= R_te_hat
+
+    ratios = []
+    for a in range(n_components):
+        ss_a = ss_contrib[a]
+        pr_a = press_contrib[a]
+        ratio = 1.0 if np.isclose(ss_a, 0.0) else pr_a / ss_a
+        ratio = max(ratio, -0.1)
+        ratios.append(ratio)
+
+    pc_q2 = 1.0 - np.prod(ratios)
+    return pc_scores, pc_loadings, pc_r2, pc_q2

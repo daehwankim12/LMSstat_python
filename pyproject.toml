@@ -4,14 +4,13 @@ build-backend   = "flit_core.buildapi"
 
 [project]
 name            = "lmsstat"
-version         = "0.1.0.dev2"
+version         = "0.1.0.dev4"
 readme          = "README.md"
 authors         = [{ name = "Daehwan Kim", email = "kdh5358@snu.ac.kr" }]
 dynamic         = ["description"]
 
 dependencies = [
   "ipykernel",
-  "jupyter",
   "numpy >= 2.0.0",
   "pandas >= 2.0.0",
   "scipy >= 1.11.0",

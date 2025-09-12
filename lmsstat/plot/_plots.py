@@ -417,7 +417,7 @@ def plot_plsda(
     -------
     ggplot object, R²X (float), R²Y (float), Q² (float)
     """
-    lv_scores, _, r2x, r2y, q2 = plsda(data)
+    lv_scores, _, r2x, r2y, q2, vip_df = plsda(data)
 
     df = lv_scores.copy()
     df["Group"] = data.iloc[:, 1].astype(str).values
@@ -457,4 +457,6 @@ def plot_plsda(
     if show:
         print(g)
 
-    return g, r2x, r2y, q2
+    vips = vip_df.sort_values(by="VIP", ascending=False)
+
+    return g, r2x, r2y, q2, vips

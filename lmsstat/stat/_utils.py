@@ -60,7 +60,7 @@ def scaling(data, method="auto"):
     scaler.fit(scaled_data)
 
     if method == "auto":
-        scaler.scale_ = np.std(scaled_data, axis=1, ddof=1).to_list()
+        scaler.scale_ = np.std(scaled_data, axis=0, ddof=1).to_list()
         scaled_data = pd.DataFrame(
             scaler.transform(scaled_data), columns=scaled_data.columns
         )

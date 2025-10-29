@@ -72,4 +72,5 @@ def scaling(data, method="auto"):
     else:
         raise ValueError("Invalid scaling method.")
 
-    return pd.concat([data[["Sample", "Group"]], scaled_data], axis=1)
+    return pd.concat([data[["Sample", "Group"]].reset_index(drop=True),
+                  scaled_data.reset_index(drop=True)], axis=1)

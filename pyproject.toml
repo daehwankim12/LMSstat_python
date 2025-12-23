@@ -4,7 +4,7 @@ build-backend   = "flit_core.buildapi"
 
 [project]
 name            = "lmsstat"
-version         = "0.1.0.dev5"
+version         = "0.1.0"
 readme          = "README.md"
 authors         = [{ name = "Daehwan Kim", email = "kdh5358@snu.ac.kr" }]
 dynamic         = ["description"]

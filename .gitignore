@@ -21,3 +21,4 @@ venv/
 
 # Tools
 .trunk
+.serena

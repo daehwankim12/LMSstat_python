@@ -4,7 +4,7 @@ build-backend   = "flit_core.buildapi"
 
 [project]
 name            = "lmsstat"
-version         = "0.1.0.dev5"
+version         = "0.1.0"
 readme          = "README.md"
 authors         = [{ name = "Daehwan Kim", email = "kdh5358@snu.ac.kr" }]
 dynamic         = ["description"]
@@ -29,4 +29,4 @@ classifiers     = [
 requires-python = ">=3.10"
 
 [project.urls]
-Source          = "https://github.com/daehwankim12/LMSstat_python"
+Source          = "https://github.com/SNUFML/LMSstat_python"

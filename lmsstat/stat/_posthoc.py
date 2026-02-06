@@ -10,6 +10,8 @@ import pandas as pd
 import scipy.stats as ss
 from scipy.stats import false_discovery_control
 
+from ._utils import _sanitize_pvalues_array, _sanitize_pvalues_df
+
 
 def preprocess_groups(groups_split):
     """
@@ -75,15 +77,21 @@ def posthoc_scheffe(x: np.ndarray) -> np.ndarray:
     vars_ = np.nanvar(x, axis=0, ddof=1)
     vars_ = np.nan_to_num(vars_, nan=0.0)
 
-    mse = np.sum((counts - 1) * vars_, axis=0) / (N - k)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        mse = np.sum((counts - 1) * vars_, axis=0) / (N - k)
 
-    invn = 1.0 / counts
-    denom = mse * (k - 1) * (invn[:, None, :] + invn[None, :, :])
+        invn = 1.0 / counts
+        denom = mse * (k - 1) * (invn[:, None, :] + invn[None, :, :])
 
-    diff2 = (means[:, None, :] - means[None, :, :]) ** 2
-    F = np.where(denom == 0, np.inf, diff2 / denom)
+        diff2 = (means[:, None, :] - means[None, :, :]) ** 2
+        F = diff2 / denom
+
+        # Degenerate case: denom==0 and diff==0 should yield F=0 (p=1), not inf (p=0).
+        F = np.where((denom == 0) & (diff2 == 0), 0.0, F)
+        F = np.where((denom == 0) & (diff2 != 0), np.inf, F)
 
     pvals = ss.f.sf(F, k - 1, N - k)
+    pvals = _sanitize_pvalues_array(pvals)
 
     for i in range(k):
         pvals[i, i, :] = 1.0
@@ -129,10 +137,11 @@ def scheffe_test(groups_split, metabolite_names):
 
     rows, cols = pair_indices.T
     result = p_values_cube[rows, cols, :].T
+    result = _sanitize_pvalues_array(result)
 
-    return pd.DataFrame(result,
-                        index=metabolite_names,
-                        columns=column_labels)
+    return _sanitize_pvalues_df(
+        pd.DataFrame(result, index=metabolite_names, columns=column_labels)
+    )
 
 
 def posthoc_dunn(x: np.ndarray) -> np.ndarray:
@@ -172,7 +181,7 @@ def posthoc_dunn(x: np.ndarray) -> np.ndarray:
         np.fill_diagonal(z, 0.)
         pvals[:, :, idx] = 2. * ss.norm.sf(z)
 
-    return pvals
+    return _sanitize_pvalues_array(pvals)
 
 
 def dunn_test(groups_split, metabolite_names):
@@ -197,9 +206,13 @@ def dunn_test(groups_split, metabolite_names):
     p_cube = posthoc_dunn(cube)
     r, c = pair_idx.T
     pvals = p_cube[r, c, :].T
+    pvals = _sanitize_pvalues_array(pvals)
     pvals = np.apply_along_axis(false_discovery_control, 1, pvals)
+    pvals = _sanitize_pvalues_array(pvals)
 
-    return pd.DataFrame(pvals, index=metabolite_names, columns=col_labels)
+    return _sanitize_pvalues_df(
+        pd.DataFrame(pvals, index=metabolite_names, columns=col_labels)
+    )
 
 
 def posthoc_gameshowell(a: np.ndarray) -> np.ndarray:
@@ -212,33 +225,36 @@ def posthoc_gameshowell(a: np.ndarray) -> np.ndarray:
     Returns:
         p_values (np.ndarray): An array of shape (k, k) containing the p-values.
     """
-    # k = a.shape[1]
+    k = a.shape[1]
+    if k < 2:
+        return np.ones((k, k), dtype=float)
 
     group_means = np.nanmean(a, axis=0)
     group_vars = np.nanvar(a, axis=0, ddof=1)
-    group_counts = np.sum(~np.isnan(a), axis=0)
+    group_counts = np.sum(~np.isnan(a), axis=0).astype(float)
 
-    mean_diffs = group_means[:, np.newaxis] - group_means
-    var_diffs = (
-            group_vars[:, np.newaxis] / group_counts[:, np.newaxis]
-            + group_vars / group_counts
-    )
-    denom = np.sqrt(var_diffs)
+    mean_diffs = np.abs(group_means[:, np.newaxis] - group_means)
+    var_over_n = group_vars / group_counts
+    var_diffs = var_over_n[:, np.newaxis] + var_over_n
 
-    q_values = mean_diffs / denom
-    np.fill_diagonal(q_values, 0)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        q_values = np.sqrt(2.0) * mean_diffs / np.sqrt(var_diffs)
+        df = var_diffs ** 2 / (
+            (var_over_n[:, np.newaxis] ** 2) / (group_counts[:, np.newaxis] - 1)
+            + (var_over_n[np.newaxis, :] ** 2) / (group_counts[np.newaxis, :] - 1)
+        )
 
-    # Calculate Welch's degrees of freedom
-    df = var_diffs ** 2 / (
-            (group_vars[:, np.newaxis] / group_counts[:, np.newaxis]) ** 2
-            / (group_counts[:, np.newaxis] - 1)
-            + (group_vars / group_counts) ** 2 / (group_counts - 1)
-    )
+    q_values = np.where((var_diffs == 0) & (mean_diffs == 0), 0.0, q_values)
+    q_values = np.where((var_diffs == 0) & (mean_diffs != 0), np.inf, q_values)
 
-    p_values = 2 * ss.t.sf(np.abs(q_values), df)
-    np.fill_diagonal(p_values, 1)
+    p_values = np.ones_like(q_values, dtype=float)
+    valid_df = np.isfinite(df) & (df > 0)
+    if np.any(valid_df):
+        p_values[valid_df] = ss.studentized_range.sf(q_values[valid_df], k, df[valid_df])
+    p_values = np.where((var_diffs == 0) & (mean_diffs != 0), 0.0, p_values)
+    np.fill_diagonal(p_values, 1.0)
 
-    return p_values
+    return _sanitize_pvalues_array(p_values)
 
 
 def games_howell_test(groups_split, metabolite_names):
@@ -256,23 +272,27 @@ def games_howell_test(groups_split, metabolite_names):
     group_combinations = list(it.combinations(group_names, 2))
     num_combinations = len(group_combinations)
 
-    preprocessed_data, max_length = preprocess_groups(groups_split)
+    preprocessed_data, _ = preprocess_groups(groups_split)
 
-    all_p_values = np.zeros((len(metabolite_names), num_combinations))
+    all_p_values = np.ones((len(metabolite_names), num_combinations), dtype=float)
+    idx_map = {g: i for i, g in enumerate(group_names)}
 
     for metabolite_idx, metabolite in enumerate(metabolite_names):
         metabolite_array = np.column_stack(
             [preprocessed_data[name][metabolite] for name in group_names]
         )
-
-        games_howell_results = posthoc_gameshowell(metabolite_array)
+        try:
+            games_howell_results = posthoc_gameshowell(metabolite_array)
+        except Exception:
+            continue
 
         for comb_idx, (i, j) in enumerate(group_combinations):
-            idx_i = group_names.index(i)
-            idx_j = group_names.index(j)
-            all_p_values[metabolite_idx, comb_idx] = games_howell_results[idx_i, idx_j]
+            idx_i = idx_map[i]
+            idx_j = idx_map[j]
+            pv = float(games_howell_results[idx_i, idx_j])
+            all_p_values[metabolite_idx, comb_idx] = pv if np.isfinite(pv) else 1.0
 
-    all_p_values = np.apply_along_axis(false_discovery_control, 1, all_p_values)
+    all_p_values = _sanitize_pvalues_array(all_p_values)
 
     p_values_df = pd.DataFrame(
         all_p_values,
@@ -280,4 +300,4 @@ def games_howell_test(groups_split, metabolite_names):
         columns=[f"({i}, {j})_games_howell" for i, j in group_combinations],
     )
 
-    return p_values_df
+    return _sanitize_pvalues_df(p_values_df)

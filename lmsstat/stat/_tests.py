@@ -6,6 +6,8 @@ import pandas as pd
 import scipy.stats as ss
 from statsmodels.stats.oneway import anova_oneway
 
+from ._utils import ensure_sample_group_columns, _sanitize_pvalues_array
+
 
 def t_test(groups_split, metabolite_names) -> pd.DataFrame:
     """
@@ -28,11 +30,11 @@ def t_test(groups_split, metabolite_names) -> pd.DataFrame:
     """
     group_names = list(groups_split.groups.keys())
     group_combinations = list(itertools.combinations(group_names, 2))
+    n_metabs = len(metabolite_names)
 
     numeric_data_groups = {
         group: groups_split.get_group(group)
-               .loc[:, metabolite_names]
-        .select_dtypes("number")
+        .loc[:, metabolite_names]
         .to_numpy(dtype=float)
         for group in group_names
     }
@@ -42,10 +44,34 @@ def t_test(groups_split, metabolite_names) -> pd.DataFrame:
     for group_a, group_b in group_combinations:
         mat_a = numeric_data_groups[group_a]
         mat_b = numeric_data_groups[group_b]
-        _, p_values = ss.ttest_ind(mat_a, mat_b,
-                                   axis=0,
-                                   equal_var=True,
-                                   nan_policy="omit")
+        try:
+            _, p_values = ss.ttest_ind(
+                mat_a,
+                mat_b,
+                axis=0,
+                equal_var=True,
+                nan_policy="omit",
+            )
+            p_values = np.asarray(p_values, dtype=float)
+            if p_values.ndim != 1 or p_values.shape[0] != n_metabs:
+                raise ValueError("Unexpected p-value shape from t-test.")
+        except Exception:
+            # Fallback: per-metabolite computation (set failures to p=1)
+            p_values = np.ones(n_metabs, dtype=float)
+            for j in range(n_metabs):
+                a = mat_a[:, j]
+                b = mat_b[:, j]
+                a = a[np.isfinite(a)]
+                b = b[np.isfinite(b)]
+                if a.size < 1 or b.size < 1:
+                    continue
+                try:
+                    _, pv = ss.ttest_ind(a, b, equal_var=True)
+                    pv = float(pv)
+                except Exception:
+                    pv = 1.0
+                p_values[j] = pv if np.isfinite(pv) else 1.0
+        p_values = _sanitize_pvalues_array(p_values)
 
         col_name = f"({group_a}, {group_b})_ttest"
         t_test_results[col_name] = p_values
@@ -97,11 +123,11 @@ def u_test(groups_split, metabolite_names) -> pd.DataFrame:
     """
     group_names = list(groups_split.groups.keys())
     group_combinations = list(itertools.combinations(group_names, 2))
+    n_metabs = len(metabolite_names)
 
     numeric_data_groups = {
         group: groups_split.get_group(group)
-               .loc[:, metabolite_names]
-        .select_dtypes("number")
+        .loc[:, metabolite_names]
         .to_numpy(dtype=float)
         for group in group_names
     }
@@ -113,12 +139,41 @@ def u_test(groups_split, metabolite_names) -> pd.DataFrame:
     for group_a, group_b in group_combinations:
         mat_a = numeric_data_groups[group_a]
         mat_b = numeric_data_groups[group_b]
-        _, p_values = ss.mannwhitneyu(mat_a, mat_b,
-                                      use_continuity=True,
-                                      alternative='two-sided',
-                                      axis=0,
-                                      method=test_method,
-                                      nan_policy='omit')
+        try:
+            _, p_values = ss.mannwhitneyu(
+                mat_a,
+                mat_b,
+                use_continuity=True,
+                alternative="two-sided",
+                axis=0,
+                method=test_method,
+                nan_policy="omit",
+            )
+            p_values = np.asarray(p_values, dtype=float)
+            if p_values.ndim != 1 or p_values.shape[0] != n_metabs:
+                raise ValueError("Unexpected p-value shape from u-test.")
+        except Exception:
+            p_values = np.ones(n_metabs, dtype=float)
+            for j in range(n_metabs):
+                a = mat_a[:, j]
+                b = mat_b[:, j]
+                a = a[np.isfinite(a)]
+                b = b[np.isfinite(b)]
+                if a.size < 1 or b.size < 1:
+                    continue
+                try:
+                    _, pv = ss.mannwhitneyu(
+                        a,
+                        b,
+                        use_continuity=True,
+                        alternative="two-sided",
+                        method=test_method,
+                    )
+                    pv = float(pv)
+                except Exception:
+                    pv = 1.0
+                p_values[j] = pv if np.isfinite(pv) else 1.0
+        p_values = _sanitize_pvalues_array(p_values)
 
         col_name = f"({group_a}, {group_b})_utest"
         u_test_results[col_name] = p_values
@@ -142,19 +197,33 @@ def anova_test(groups_split, metabolite_names) -> pd.DataFrame:
     df = groups_split.obj
     groups = df["Group"].values
 
-    anova_results = np.zeros(len(metabolite_names))
+    anova_results = np.ones(len(metabolite_names), dtype=float)
 
-    metabolite_data = df[metabolite_names].values
+    metabolite_data = df[metabolite_names].to_numpy(dtype=float)
 
     for i, _ in enumerate(metabolite_names):
-        mask = ~np.isnan(metabolite_data[:, i])
+        x = metabolite_data[:, i]
+        mask = np.isfinite(x)
+        if mask.sum() < 2:
+            continue
 
-        anova_result = anova_oneway(
-            metabolite_data[mask, i],
-            groups[mask],
-            use_var="equal"
-        )
-        anova_results[i] = anova_result.pvalue
+        x_valid = x[mask]
+        g_valid = groups[mask]
+
+        if np.unique(g_valid).size < 2:
+            continue
+        if np.nanmin(x_valid) == np.nanmax(x_valid):
+            continue
+
+        try:
+            anova_result = anova_oneway(x_valid, g_valid, use_var="equal")
+            p = float(anova_result.pvalue)
+        except Exception:
+            p = 1.0
+
+        anova_results[i] = p if np.isfinite(p) else 1.0
+
+    anova_results = _sanitize_pvalues_array(anova_results)
 
     return pd.DataFrame(
         {"p-value_ANOVA": anova_results}, index=metabolite_names
@@ -175,34 +244,79 @@ def kruskal_test(groups_split, metabolite_names) -> pd.DataFrame:
     df = groups_split.obj
     groups = df["Group"].values
 
-    kw_results = np.zeros(len(metabolite_names))
+    kw_results = np.ones(len(metabolite_names), dtype=float)
 
-    metabolite_data = df[metabolite_names].values
+    metabolite_data = df[metabolite_names].to_numpy(dtype=float)
 
     for i, _ in enumerate(metabolite_names):
-        mask = ~np.isnan(metabolite_data[:, i])
+        x = metabolite_data[:, i]
+        mask = np.isfinite(x)
+        if mask.sum() < 2:
+            continue
 
-        values = metabolite_data[mask, i]
+        values = x[mask]
         group_labels = groups[mask]
+
+        if np.unique(group_labels).size < 2:
+            continue
+        if np.nanmin(values) == np.nanmax(values):
+            continue
 
         unique_groups = np.unique(group_labels)
         group_values = [values[group_labels == g] for g in unique_groups]
+        group_values = [gv for gv in group_values if gv.size > 0]
+        if len(group_values) < 2:
+            continue
 
-        kw_result = ss.kruskal(*group_values)
-        kw_results[i] = kw_result.pvalue
+        try:
+            kw_result = ss.kruskal(*group_values)
+            p = float(kw_result.pvalue)
+        except Exception:
+            p = 1.0
+
+        kw_results[i] = p if np.isfinite(p) else 1.0
+
+    kw_results = _sanitize_pvalues_array(kw_results)
 
     return pd.DataFrame({"p-value_KW": kw_results}, index=metabolite_names)
 
 
 def norm_test(data, method='shapiro'):
-    data = data.rename(columns={data.columns[0]: "Sample", data.columns[1]: "Group"})
-    data.drop(columns=["Sample", "Group"], inplace=True)
+    method = str(method).lower()
+    if method not in {"shapiro", "normaltest"}:
+        raise ValueError("Invalid method. Use 'shapiro' or 'normaltest'.")
 
+    data = ensure_sample_group_columns(data)
+    numeric = (
+        data.drop(columns=["Sample", "Group"])
+        .apply(pd.to_numeric, errors="coerce")
+    )
+
+    def _run(col: pd.Series):
+        x = col.dropna().to_numpy(dtype=float)
+        if method == 'shapiro':
+            if x.size < 3:
+                return np.nan, 1.0
+        else:
+            if x.size < 8:
+                return np.nan, 1.0
+        if method == 'shapiro':
+            try:
+                stat, p = ss.shapiro(x)
+            except Exception:
+                return np.nan, 1.0
+        else:
+            try:
+                stat, p = ss.normaltest(x)
+            except Exception:
+                return np.nan, 1.0
+        p = float(p)
+        return float(stat), p if np.isfinite(p) else 1.0
+
+    result = numeric.apply(_run, axis=0, result_type="expand")
     if method == 'shapiro':
-        result = data.apply(func=ss.shapiro, axis=0)
         result.index = ["W-statistic", "p-value"]
     else:
-        result = data.apply(func=ss.normaltest, axis=0)
         result.index = ["χ²", "p-value"]
 
     return result

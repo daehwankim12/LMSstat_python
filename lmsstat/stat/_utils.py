@@ -60,12 +60,16 @@ def scaling(data, method="auto"):
     scaler.fit(scaled_data)
 
     if method == "auto":
-        scaler.scale_ = np.std(scaled_data, axis=0, ddof=1).to_list()
+        feature_scales = np.std(scaled_data, axis=0, ddof=1).to_numpy(dtype=float)
+        scaler.scale_ = np.where(feature_scales == 0, 1.0, feature_scales)
         scaled_data = pd.DataFrame(
             scaler.transform(scaled_data), columns=scaled_data.columns
         )
     elif method == "pareto":
-        scaler.scale_ = np.sqrt(np.std(scaled_data, axis=0, ddof=1)).to_list()
+        feature_scales = np.sqrt(np.std(scaled_data, axis=0, ddof=1)).to_numpy(
+            dtype=float
+        )
+        scaler.scale_ = np.where(feature_scales == 0, 1.0, feature_scales)
         scaled_data = pd.DataFrame(
             scaler.transform(scaled_data), columns=scaled_data.columns
         )

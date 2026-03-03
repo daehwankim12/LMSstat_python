@@ -2,7 +2,7 @@ import pandas as pd
 
 from ._posthoc import dunn_test, scheffe_test
 from ._tests import anova_test, kruskal_test, t_test, u_test
-from ._utils import p_adjust, preprocess_data
+from ._utils import _sanitize_pvalues_df, p_adjust, preprocess_data
 
 
 def allstats(data, p_adj=True):
@@ -39,9 +39,9 @@ def allstats(data, p_adj=True):
             result_anova = p_adjust(result_anova)
             result_kruskal = p_adjust(result_kruskal)
     if num_groups == 2:
-        return pd.concat([result_t, result_u], axis=1)
+        out = pd.concat([result_t, result_u], axis=1)
     else:
-        return pd.concat(
+        out = pd.concat(
             [
                 result_t,
                 result_u,
@@ -52,3 +52,4 @@ def allstats(data, p_adj=True):
             ],
             axis=1,
         )
+    return _sanitize_pvalues_df(out)

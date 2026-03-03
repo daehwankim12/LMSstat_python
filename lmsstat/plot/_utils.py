@@ -2,12 +2,11 @@ import numpy as np
 import pandas as pd
 from matplotlib.colors import to_hex
 from matplotlib.pyplot import colormaps
-from plotnine import geom_segment, aes, annotate
+from plotnine import annotate
 from sklearn.cross_decomposition import PLSRegression
 from sklearn.decomposition import PCA
-from sklearn.model_selection import KFold, GroupKFold
 
-from ..stat._utils import scaling
+from ..stat._utils import ensure_sample_group_columns, scaling
 
 
 def _pal(n: int):
@@ -20,7 +19,7 @@ def _pal(n: int):
 
 # ───────── Bracket + Star annotation helper ─────────
 def _annot(gg, stat_tbl: pd.DataFrame, order: list[str], y_top: float, *, offset: float = 0.05, step: float = 0.05,
-           tip: float = 0.01, star: int = 10, line: float = 0.15):
+           y_span: float | None = None, tip: float = 0.01, star: int = 10, line: float = 0.15):
     """
     Add bracket-style significance annotations to a plotnine object.
 
@@ -41,25 +40,62 @@ def _annot(gg, stat_tbl: pd.DataFrame, order: list[str], y_top: float, *, offset
     line : float
         Line thickness.
     """
-    # Filter by significance level p ≤ .05
-    stat_tbl = stat_tbl.loc[stat_tbl.p_value <= 0.05]
-    if stat_tbl.empty or not {'group1', 'group2', 'p_value'}.issubset(stat_tbl.columns):
+    if stat_tbl is None or stat_tbl.empty:
         return gg
+
+    required = {"group1", "group2", "p_value"}
+    if not required.issubset(stat_tbl.columns):
+        return gg
+
+    # Filter by significance level p ≤ .05
+    stat_tbl = stat_tbl.loc[:, ["group1", "group2", "p_value"]].copy()
+    stat_tbl["p_value"] = pd.to_numeric(stat_tbl["p_value"], errors="coerce")
+    stat_tbl = stat_tbl.dropna(subset=["p_value"])
+    stat_tbl = stat_tbl.loc[stat_tbl["p_value"] <= 0.05]
+    if stat_tbl.empty:
+        return gg
+
+    xpos = {g: i + 1 for i, g in enumerate(order)}
+
+    if y_span is None or not np.isfinite(y_span) or y_span <= 0:
+        y_span = abs(float(y_top)) if np.isfinite(y_top) and y_top != 0 else 1.0
 
     level = 0
     for _, r in stat_tbl.iterrows():
-        if r.group1 not in order or r.group2 not in order:
+        g1 = r["group1"]
+        g2 = r["group2"]
+        p = float(r["p_value"])
+        if g1 not in xpos or g2 not in xpos:
             continue
-        x1, x2 = order.index(r.group1) + 1, order.index(r.group2) + 1
-        y = y_top * (1 + offset + step * level)
-        y2 = y - tip * y_top
-        s = '**' if r.p_value <= 0.01 else '*'
+        x1, x2 = xpos[g1], xpos[g2]
+        if x1 == x2:
+            continue
+        if x1 > x2:
+            x1, x2 = x2, x1
+
+        y = float(y_top) + y_span * (offset + step * level)
+        y2 = y - tip * y_span
+
+        if p <= 0.001:
+            s = "***"
+        elif p <= 0.01:
+            s = "**"
+        else:
+            s = "*"
         level += 1
 
-        gg += geom_segment(aes(x=x1, xend=x2, y=y, yend=y), size=line)
-        gg += geom_segment(aes(x=x1, xend=x1, y=y, yend=y2), size=line)
-        gg += geom_segment(aes(x=x2, xend=x2, y=y, yend=y2), size=line)
-        gg += annotate('text', x=(x1 + x2) / 2, y=y, label=s, size=star, ha='center', va='bottom')
+        gg += annotate("segment", x=x1, xend=x2, y=y, yend=y, size=line)
+        gg += annotate("segment", x=x1, xend=x1, y=y, yend=y2, size=line)
+        gg += annotate("segment", x=x2, xend=x2, y=y, yend=y2, size=line)
+        gg += annotate(
+            "text",
+            x=(x1 + x2) / 2,
+            y=y,
+            label=s,
+            size=star,
+            ha="center",
+            va="bottom",
+        )
     return gg
 
 
@@ -75,17 +111,46 @@ def simca_cv_groups(n_samples, cv_splits=7):
     return np.arange(n_samples) % cv_splits
 
 
+def _validate_n_components(
+        n_components: int,
+        max_components: int,
+        *,
+        model_name: str,
+):
+    if not isinstance(n_components, int):
+        raise TypeError("n_components must be an integer.")
+    if n_components < 1:
+        raise ValueError("n_components must be >= 1.")
+    if max_components < 1:
+        raise ValueError(f"{model_name} requires at least one usable component.")
+    if n_components > max_components:
+        raise ValueError(
+            f"{model_name} supports at most {max_components} component(s) "
+            f"for this input. Reduce n_components from {n_components}."
+        )
+
+
 def plsda(data: pd.DataFrame, n_components: int = 2, scale: bool = True, cv_splits: int = 7, random_state: int = 42):
+    data = ensure_sample_group_columns(data)
     if scale:
         data = scaling(data, "auto")
 
-    data = data.rename(columns={data.columns[0]: "Sample", data.columns[1]: "Group"})
     X_df = data.drop(columns=["Sample", "Group"])
     X = X_df.to_numpy(float)
+    n_samples, n_features = X.shape
+    if n_samples < 2:
+        raise ValueError("PLS-DA requires at least 2 samples.")
+    if n_features < 1:
+        raise ValueError("PLS-DA requires at least one feature column.")
 
     y_labels = data["Group"].astype(str)
     Y_df = pd.get_dummies(y_labels)
     Y = Y_df.to_numpy(float)
+    if Y.shape[1] < 2:
+        raise ValueError("PLS-DA requires at least 2 groups.")
+
+    max_components = min(n_samples - 1, n_features, Y.shape[1])
+    _validate_n_components(n_components, max_components, model_name="PLS-DA")
 
     pls = PLSRegression(n_components=n_components, scale=False, max_iter=200).fit(X, Y)
 
@@ -102,7 +167,6 @@ def plsda(data: pd.DataFrame, n_components: int = 2, scale: bool = True, cv_spli
     tss_x = np.sum(Xc ** 2)
     r2x_cum = 0.0 if np.isclose(tss_x, 0.0) else 1.0 - sse_x / tss_x
 
-    n_samples = X.shape[0]
     cv_splits = min(max(2, cv_splits), n_samples)
     groups = simca_cv_groups(n_samples, cv_splits)
 
@@ -114,29 +178,42 @@ def plsda(data: pd.DataFrame, n_components: int = 2, scale: bool = True, cv_spli
         tr_idx = np.where(groups != g)[0]
         X_tr, X_te = X[tr_idx], X[te_idx]
         Y_tr, Y_te = Y[tr_idx], Y[te_idx]
+        try:
+            pls_fold = PLSRegression(
+                n_components=n_components, scale=False, max_iter=200
+            ).fit(X_tr, Y_tr)
 
-        pls_fold = PLSRegression(n_components=n_components, scale=False, max_iter=200).fit(X_tr, Y_tr)
+            W = pls_fold.x_weights_
+            P = pls_fold.x_loadings_
+            Q = pls_fold.y_loadings_
+            X0 = pls_fold._x_mean
+            Y0 = pls_fold._y_mean
+            ptw = P.T @ W
+            if not np.isfinite(ptw).all():
+                raise ValueError("Non-finite P.T @ W in cross-validation fold.")
+            W_star = W @ np.linalg.pinv(ptw)
+            if not np.isfinite(W_star).all():
+                raise ValueError("Non-finite W* in cross-validation fold.")
 
-        W = pls_fold.x_weights_
-        P = pls_fold.x_loadings_
-        Q = pls_fold.y_loadings_
-        X0 = pls_fold._x_mean
-        Y0 = pls_fold._y_mean
-        W_star = W @ np.linalg.inv(P.T @ W)
+            Xc_te = X_te - X0
+            Y_pred_prev = np.tile(Y0, (len(te_idx), 1))
 
-        Xc_te = X_te - X0
-        Y_pred_prev = np.tile(Y0, (len(te_idx), 1))
+            for a in range(n_components):
+                ss_now = np.sum((Y_te - Y_pred_prev) ** 2)
+                ss[a] += ss_now
+                if np.isclose(ss_now, 0.0):
+                    break
 
-        for a in range(n_components):
+                B_a = W_star[:, :a + 1] @ Q[:, :a + 1].T
+                Y_hat = Xc_te @ B_a + Y0
+                press[a] += np.sum((Y_te - Y_hat) ** 2)
+                Y_pred_prev = Y_hat
+        except Exception:
+            y0 = Y_tr.mean(axis=0, keepdims=False)
+            Y_pred_prev = np.tile(y0, (len(te_idx), 1))
             ss_now = np.sum((Y_te - Y_pred_prev) ** 2)
-            ss[a] += ss_now
-            if np.isclose(ss_now, 0.0):
-                break
-
-            B_a = W_star[:, :a + 1] @ Q[:, :a + 1].T
-            Y_hat = Xc_te @ B_a + Y0
-            press[a] += np.sum((Y_te - Y_hat) ** 2)
-            Y_pred_prev = Y_hat
+            ss += ss_now
+            press += ss_now
 
     ratios = []
     for a in range(n_components):
@@ -158,21 +235,30 @@ def plsda(data: pd.DataFrame, n_components: int = 2, scale: bool = True, cv_spli
     r2_explained = [r2_cum_list[0]] + [r2_cum_list[a] - r2_cum_list[a - 1] for a in range(1, n_components)]
     sum_r2_explained = sum(r2_explained)
     vip_scores = np.zeros(p)
-    for j in range(p):
-        vip_j = np.sum((W[j, :] ** 2) * r2_explained)
-        vip_scores[j] = np.sqrt(p * vip_j / sum_r2_explained)
+    if not np.isclose(sum_r2_explained, 0.0):
+        for j in range(p):
+            vip_j = np.sum((W[j, :] ** 2) * r2_explained)
+            vip_scores[j] = np.sqrt(p * vip_j / sum_r2_explained)
     vip_df = pd.DataFrame(vip_scores, index=X_df.columns, columns=["VIP"])
 
     return lv_scores, lv_loadings, r2x_cum, r2y_cum, q2_cum, vip_df
 
 
 def pca(data: pd.DataFrame, n_components: int = 2, scale: bool = True, cv_splits: int = 7, random_state: int = 42):
+    data = ensure_sample_group_columns(data)
     if scale:
         data = scaling(data, method="auto")
 
-    data = data.rename(columns={data.columns[0]: "Sample", data.columns[1]: "Group"})
     X_df = data.drop(columns=["Sample", "Group"])
     X = X_df.to_numpy(float)
+    n_samples, n_features = X.shape
+    if n_samples < 2:
+        raise ValueError("PCA requires at least 2 samples for cross-validated Q2.")
+    if n_features < 1:
+        raise ValueError("PCA requires at least one feature column.")
+
+    max_components = min(n_samples, n_features)
+    _validate_n_components(n_components, max_components, model_name="PCA")
 
     pc = PCA(n_components=n_components).fit(X)
 
@@ -181,7 +267,6 @@ def pca(data: pd.DataFrame, n_components: int = 2, scale: bool = True, cv_splits
     pc_loadings = pd.DataFrame(pc.components_.T, index=X_df.columns, columns=pc_cols)
     pc_r2 = pc.explained_variance_ratio_.sum()
 
-    n_samples = X.shape[0]
     cv_splits = min(max(2, cv_splits), n_samples)
     groups = simca_cv_groups(n_samples, cv_splits)
 

@@ -13,27 +13,32 @@ from scipy.stats import false_discovery_control
 from ._utils import _sanitize_pvalues_array, _sanitize_pvalues_df
 
 
-def preprocess_groups(groups_split):
+def preprocess_groups(groups_split, metabolite_names=None):
     """
     Preprocesses groups_split by padding the data with NaNs to make all groups the same length.
-    Optimized version.
 
     Args:
         groups_split (pandas.core.groupby.DataFrameGroupBy): A pandas DataFrameGroupBy object.
+        metabolite_names (list[str] | None): Columns to process. If None, uses all
+            columns except 'Sample' and 'Group'.
 
     Returns:
         tuple: A tuple containing:
             - preprocessed_data (dict): A dictionary containing preprocessed data for each group.
             - max_length (int): The maximum length of all groups after padding with NaNs.
     """
-    # Calculate the maximum length and preprocess the data in a single pass
+    if metabolite_names is None:
+        all_cols = list(groups_split.obj.columns)
+        metabolite_names = [c for c in all_cols if c not in ("Sample", "Group")]
+
     preprocessed_data = {}
     max_length = 0
     for name, group in groups_split:
         group_data = {
-            metabolite: group[metabolite].dropna().to_numpy() for metabolite in group
+            metabolite: group[metabolite].dropna().to_numpy()
+            for metabolite in metabolite_names
         }
-        current_max = max(len(data) for data in group_data.values())
+        current_max = max(len(data) for data in group_data.values()) if group_data else 0
         max_length = max(max_length, current_max)
 
         preprocessed_data[name] = group_data
@@ -272,7 +277,7 @@ def games_howell_test(groups_split, metabolite_names):
     group_combinations = list(it.combinations(group_names, 2))
     num_combinations = len(group_combinations)
 
-    preprocessed_data, _ = preprocess_groups(groups_split)
+    preprocessed_data, _ = preprocess_groups(groups_split, metabolite_names)
 
     all_p_values = np.ones((len(metabolite_names), num_combinations), dtype=float)
     idx_map = {g: i for i, g in enumerate(group_names)}

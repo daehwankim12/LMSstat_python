@@ -160,7 +160,7 @@ def plsda(data: pd.DataFrame, n_components: int = 2, scale: bool = True, cv_spli
 
     r2y_cum = pls.score(X, Y)
 
-    X_mean = pls._x_mean
+    X_mean = X.mean(axis=0)
     Xc = X - X_mean
     X_hat = pls.x_scores_ @ pls.x_loadings_.T
     sse_x = np.sum((Xc - X_hat) ** 2)
@@ -186,8 +186,8 @@ def plsda(data: pd.DataFrame, n_components: int = 2, scale: bool = True, cv_spli
             W = pls_fold.x_weights_
             P = pls_fold.x_loadings_
             Q = pls_fold.y_loadings_
-            X0 = pls_fold._x_mean
-            Y0 = pls_fold._y_mean
+            X0 = X_tr.mean(axis=0)
+            Y0 = Y_tr.mean(axis=0)
             ptw = P.T @ W
             if not np.isfinite(ptw).all():
                 raise ValueError("Non-finite P.T @ W in cross-validation fold.")
@@ -260,7 +260,7 @@ def pca(data: pd.DataFrame, n_components: int = 2, scale: bool = True, cv_splits
     max_components = min(n_samples, n_features)
     _validate_n_components(n_components, max_components, model_name="PCA")
 
-    pc = PCA(n_components=n_components).fit(X)
+    pc = PCA(n_components=n_components, random_state=random_state).fit(X)
 
     pc_cols = [f"PC{i + 1}" for i in range(n_components)]
     pc_scores = pd.DataFrame(pc.transform(X), columns=pc_cols)

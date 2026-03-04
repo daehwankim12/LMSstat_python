@@ -1,5 +1,4 @@
 import itertools
-from typing import List
 
 import numpy as np
 import pandas as pd
@@ -7,6 +6,8 @@ import scipy.stats as ss
 from statsmodels.stats.oneway import anova_oneway
 
 from ._utils import ensure_sample_group_columns, _sanitize_pvalues_array
+
+_UTEST_EXACT_MAX_N = 10
 
 
 def t_test(groups_split, metabolite_names) -> pd.DataFrame:
@@ -87,7 +88,7 @@ def _decide_utest_method(groups_split, metabolite_names) -> str:
     or ‘asymptotic’.
 
     Rule (agreed with domain experts):
-        • exact  ‑ if the largest group has THRESHOLD (<= 10) samples
+        • exact  ‑ if the largest group has <= _UTEST_EXACT_MAX_N samples
                    AND there is absolutely no tie in any metabolite column
         • otherwise asymptotic
     """
@@ -98,7 +99,7 @@ def _decide_utest_method(groups_split, metabolite_names) -> str:
     df_all = groups_split.obj[metabolite_names].select_dtypes("number")
     has_ties = df_all.apply(lambda col: col.duplicated().any()).any()
 
-    method = "exact" if (max_n <= 10 and not has_ties) else "asymptotic"
+    method = "exact" if (max_n <= _UTEST_EXACT_MAX_N and not has_ties) else "asymptotic"
 
     return method
 

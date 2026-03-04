@@ -7,12 +7,13 @@ from ._utils import _sanitize_pvalues_df, p_adjust, preprocess_data
 
 def allstats(data, p_adj=True):
     """
-    Generates a statistical analysis of the given file.
+    Generates a statistical analysis of the given data.
 
     Parameters:
-        data (str): Data to be analyzed.
+        data (pd.DataFrame): DataFrame to be analyzed.
+            Column 0 = Sample, Column 1 = Group, remaining columns = metabolites/features.
 
-        P_adj (bool, optional): Whether to perform p-value adjustment. Defaults to True.
+        p_adj (bool, optional): Whether to perform p-value adjustment. Defaults to True.
 
     Returns:
         pandas.DataFrame: The statistical analysis results.

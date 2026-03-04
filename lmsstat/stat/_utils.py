@@ -81,7 +81,7 @@ def p_adjust(mat):
 
 def correlation(data, axis="sample", method="pearson"):
     data = ensure_sample_group_columns(data)
-    data = data.drop(columns=["Sample", "Group"])
+    data = data.drop(columns=["Sample", "Group"]).apply(pd.to_numeric, errors="coerce")
     axis = axis.lower()
     if axis == "sample":
         return data.transpose().corr(method=method)

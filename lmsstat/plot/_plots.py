@@ -24,10 +24,8 @@ from plotnine import (
 from ._utils import _annot, _pal, scaling, pca, plsda
 from ..stat._utils import ensure_sample_group_columns
 
-# silence plotnine’s “saving with transparency” warnings, etc.
+import gc
 import warnings
-
-warnings.filterwarnings("ignore", category=UserWarning)
 
 
 # ---------------------------------------------------------------------- #
@@ -367,13 +365,14 @@ def _worker_plot_one(idx: int):
     Path(_W_OUTDIR).mkdir(exist_ok=True)
     fname = _safe_filename(metab, f"_{_W_KIND}.png")
 
-    fig = g.draw()
-    fig.set_size_inches(6, 6)
-    fig.savefig(Path(_W_OUTDIR, fname), dpi=600, pil_kwargs={"compress_level": 3})
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", UserWarning)
+        fig = g.draw()
+        fig.set_size_inches(6, 6)
+        fig.savefig(Path(_W_OUTDIR, fname), dpi=600, pil_kwargs={"compress_level": 3})
     plt.close(fig)
 
     del g, fig, df, st
-    import gc
     gc.collect()
 
 
@@ -811,11 +810,15 @@ def plot_pca(
 
     if save_path:
         Path(save_path).parent.mkdir(exist_ok=True)
-        fig = g.draw()
-        fig.savefig(save_path, dpi=dpi, bbox_inches="tight")
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            fig = g.draw()
+            fig.savefig(save_path, dpi=dpi, bbox_inches="tight")
         plt.close(fig)
     if show:
-        print(g)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            print(g)
 
     return g, r2, q2
 
@@ -931,9 +934,11 @@ def plot_heatmap(
         cg.ax_row_dendrogram.set_visible(False)
         cg.ax_col_dendrogram.set_visible(False)
 
-    plt.tight_layout()
-    Path(out_path).parent.mkdir(exist_ok=True)
-    cg.figure.savefig(out_path, dpi=dpi, bbox_inches="tight")
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", UserWarning)
+        plt.tight_layout()
+        Path(out_path).parent.mkdir(exist_ok=True)
+        cg.figure.savefig(out_path, dpi=dpi, bbox_inches="tight")
     plt.close(cg.figure)
     return None
 
@@ -1000,11 +1005,15 @@ def plot_plsda(
 
     if save_path:
         Path(save_path).parent.mkdir(exist_ok=True)
-        fig = g.draw()
-        fig.savefig(save_path, dpi=dpi, bbox_inches="tight")
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            fig = g.draw()
+            fig.savefig(save_path, dpi=dpi, bbox_inches="tight")
         plt.close(fig)
     if show:
-        print(g)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            print(g)
 
     vips = vip_df.sort_values(by="VIP", ascending=False)
 

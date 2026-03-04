@@ -10,7 +10,6 @@ authors         = [{ name = "Daehwan Kim", email = "kdh5358@snu.ac.kr" }]
 dynamic         = ["description"]
 
 dependencies = [
-  "ipykernel",
   "numpy >= 2.0.0",
   "pandas >= 2.0.0",
   "scipy >= 1.11.0",
@@ -27,6 +26,20 @@ classifiers     = [
   "Operating System :: OS Independent",
 ]
 requires-python = ">=3.10"
+
+[project.optional-dependencies]
+jupyter = ["ipykernel"]
+test = ["pytest>=7.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = [
+    "ignore::UserWarning",
+    "ignore::FutureWarning",
+]
+markers = [
+    "slow: marks tests as slow (plot tests)",
+]
 
 [project.urls]
 Source          = "https://github.com/SNUFML/LMSstat_python"

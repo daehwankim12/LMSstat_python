@@ -51,6 +51,8 @@ def impute_missing(data: pd.DataFrame, method: str = "half_min") -> pd.DataFrame
           minimum observed value.
         * ``"half_min"`` – replace NaN with half the feature's minimum observed
           value (a common below-limit-of-detection imputation for LC-MS data).
+          Intended for raw, non-negative intensity data; with negative values
+          half of a negative minimum is more negative, which is rarely meaningful.
         * ``"knn"``      – k-nearest-neighbours imputation across samples.
 
     Notes
@@ -69,13 +71,17 @@ def impute_missing(data: pd.DataFrame, method: str = "half_min") -> pd.DataFrame
     else:  # knn
         from sklearn.impute import KNNImputer
 
-        n_samples = numeric.shape[0]
-        n_neighbors = max(1, min(5, n_samples - 1))
-        X = numeric.to_numpy(dtype=float)
-        imputed = KNNImputer(n_neighbors=n_neighbors).fit_transform(X)
-        numeric = pd.DataFrame(
-            imputed, columns=numeric.columns, index=numeric.index
-        )
+        # KNNImputer drops all-missing columns, so impute only the columns with
+        # at least one observed value and leave all-NaN features as NaN.
+        observed = numeric.columns[numeric.notna().any(axis=0)]
+        if len(observed) > 0:
+            n_samples = numeric.shape[0]
+            n_neighbors = max(1, min(5, n_samples - 1))
+            imputed = KNNImputer(n_neighbors=n_neighbors).fit_transform(
+                numeric[observed].to_numpy(dtype=float)
+            )
+            numeric = numeric.copy()
+            numeric[observed] = imputed
 
     return _reassemble(data, numeric)
 
@@ -101,6 +107,8 @@ def log_transform(data: pd.DataFrame, base: float = 2, offset: float = 1.0) -> p
     """
     if not np.isfinite(base) or base <= 0 or base == 1:
         raise ValueError("base must be a positive number other than 1.")
+    if not np.isfinite(offset):
+        raise ValueError("offset must be a finite number.")
 
     data, numeric = _split(data)
 

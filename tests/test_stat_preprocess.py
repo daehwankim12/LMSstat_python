@@ -121,6 +121,19 @@ class TestImputeMissing:
         out = impute_missing(df, method="half_min")
         assert out["Met_0"].isna().all()
 
+    def test_knn_all_nan_column_stays_nan(self):
+        df = pd.DataFrame(
+            {"Sample": ["a", "b", "c"], "Group": ["A", "A", "B"],
+             "Met_0": [np.nan, np.nan, np.nan],
+             "Met_1": [1.0, np.nan, 3.0],
+             "Met_2": [4.0, 5.0, 6.0]}
+        )
+        out = impute_missing(df, method="knn")
+        # Column order preserved, all-NaN feature stays NaN, others imputed.
+        assert list(out.columns) == list(df.columns)
+        assert out["Met_0"].isna().all()
+        assert out["Met_1"].isna().sum() == 0
+
     def test_single_group(self, single_group_data):
         out = impute_missing(single_group_data, method="min")
         assert out["Met_0"].isna().sum() == 0
@@ -180,6 +193,11 @@ class TestLogTransform:
     def test_invalid_base_raises(self, simple_data):
         with pytest.raises(ValueError):
             log_transform(simple_data, base=1)
+
+    @pytest.mark.parametrize("bad_offset", [np.nan, np.inf, -np.inf])
+    def test_non_finite_offset_raises(self, simple_data, bad_offset):
+        with pytest.raises(ValueError):
+            log_transform(simple_data, offset=bad_offset)
 
 
 # ── normalize ──────────────────────────────────────────────────────────────

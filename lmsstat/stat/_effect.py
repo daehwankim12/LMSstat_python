@@ -107,10 +107,14 @@ def effect_size_table(data, stats_res=None, *, group_order=None, p_source="t-tes
         fold_change = np.where(both_pos, ratio, np.nan)
         log2fc = np.where(both_pos, np.log2(np.where(both_pos, ratio, 1.0)), np.nan)
 
-    # Cohen's d with pooled standard deviation.
+    # Cohen's d with pooled standard deviation. A group with a single finite
+    # value (n <= 1) has undefined variance; it contributes zero sum-of-squares
+    # rather than propagating NaN, so d stays computable from the other group.
     df_pool = n1 + n2 - 2
+    ss1 = np.where(n1 > 1, (n1 - 1) * np.nan_to_num(var1, nan=0.0), 0.0)
+    ss2 = np.where(n2 > 1, (n2 - 1) * np.nan_to_num(var2, nan=0.0), 0.0)
     with np.errstate(divide="ignore", invalid="ignore"):
-        s_pooled = np.sqrt(((n1 - 1) * var1 + (n2 - 1) * var2) / df_pool)
+        s_pooled = np.sqrt((ss1 + ss2) / df_pool)
     cohens_d = np.full(len(metabolite_names), np.nan, dtype=float)
     usable = (df_pool > 0) & np.isfinite(s_pooled) & (s_pooled > 0)
     cohens_d[usable] = (mean2[usable] - mean1[usable]) / s_pooled[usable]
@@ -120,6 +124,12 @@ def effect_size_table(data, stats_res=None, *, group_order=None, p_source="t-tes
 
     if stats_res is None:
         stats_res = allstats(data, p_adj=False)
+    missing = [f for f in metabolite_names if f not in stats_res.index]
+    if missing:
+        raise ValueError(
+            "stats_res is missing p-values for "
+            f"{len(missing)} feature(s), e.g. {missing[:5]}."
+        )
     p_col = _find_p_column(stats_res, group1, group2, key)
     p_value = _sanitize_pvalues_array(
         stats_res.reindex(metabolite_names)[p_col].to_numpy(dtype=float)

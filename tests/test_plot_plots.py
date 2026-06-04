@@ -252,3 +252,18 @@ class TestPlotVolcano:
         # Should floor p for plotting and not raise on -log10(0).
         plot_volcano(et, save_path=str(save))
         assert save.exists()
+
+    def test_drops_nonfinite_pvalue_rows(self, two_group_data, tmp_path):
+        et = effect_size_table(two_group_data)
+        et.loc[et.index[0], "p_adj"] = np.nan  # invalid p → must be dropped, not plotted at y=0
+        save = tmp_path / "volcano_partial.png"
+        g = plot_volcano(et, save_path=str(save))
+        # The plotted data must exclude the NaN-p feature.
+        assert len(g.data) == len(et) - 1
+        assert save.exists()
+
+    def test_all_nonplottable_raises(self, two_group_data):
+        et = effect_size_table(two_group_data)
+        et["p_adj"] = np.nan
+        with pytest.raises(ValueError):
+            plot_volcano(et)

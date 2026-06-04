@@ -124,3 +124,23 @@ class TestEffectSizeTable:
         out = effect_size_table(df).set_index("feature")
         assert out.loc["Met_0", "mean1"] == pytest.approx(1.0)
         assert out.loc["Met_0", "mean2"] == pytest.approx(5.0)
+
+    def test_cohens_d_with_singleton_group(self):
+        # Group A has a single finite value (n1 == 1): its variance is undefined,
+        # but Cohen's d should still be computable from group B's spread.
+        df = pd.DataFrame(
+            {"Sample": ["a", "b", "c", "d"], "Group": ["A", "A", "B", "B"],
+             "Met_0": [2.0, np.nan, 4.0, 6.0]}  # A: one finite (2.0); B: [4, 6]
+        )
+        out = effect_size_table(df).set_index("feature")
+        d = out.loc["Met_0", "cohens_d"]
+        assert np.isfinite(d)
+        # ss_A = 0 (n1 == 1); ss_B = (2-1)*var_B = 2; df_pool = 1+2-2 = 1
+        # s_pooled = sqrt((0 + 2) / 1) = sqrt(2); d = (5 - 2) / sqrt(2)
+        assert d == pytest.approx(3.0 / np.sqrt(2.0))
+
+    def test_stats_res_missing_feature_raises(self, two_group_known):
+        st = allstats(two_group_known, p_adj=False)
+        st_partial = st.drop(index="Met_1")  # omit a feature present in data
+        with pytest.raises(ValueError):
+            effect_size_table(two_group_known, stats_res=st_partial)

@@ -1075,12 +1075,22 @@ def plot_volcano(
             "p": pd.to_numeric(eff_table[pcol], errors="coerce"),
         }
     )
-    # Drop features without a placeable x value (e.g. non-positive means).
-    df = df[np.isfinite(df["log2fc"].to_numpy(dtype=float))].copy()
+    # Drop features that cannot be placed: non-finite log2fc (e.g. non-positive
+    # means) or non-finite p-value (would otherwise be drawn at a bogus y=0).
+    finite = (
+        np.isfinite(df["log2fc"].to_numpy(dtype=float))
+        & np.isfinite(df["p"].to_numpy(dtype=float))
+    )
+    df = df[finite].copy()
+    if df.empty:
+        raise ValueError(
+            "No plottable features: every row has a non-finite log2fc or "
+            f"{pcol}."
+        )
 
     p_vals = df["p"].to_numpy(dtype=float)
     # Floor p at a tiny positive value so -log10(p) is never infinite.
-    p_floor = np.clip(np.nan_to_num(p_vals, nan=1.0), 1e-300, 1.0)
+    p_floor = np.clip(p_vals, 1e-300, 1.0)
     df["neglog10p"] = -np.log10(p_floor)
 
     sig = p_floor <= p_threshold

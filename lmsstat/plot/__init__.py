@@ -1,1 +1,1 @@
-from ._plots import plot_pca, plot_box, plot_bar, plot_heatmap, plot_plsda, plot_volcano
+from ._plots import plot_pca, plot_box, plot_bar, plot_heatmap, plot_plsda, plot_volcano, plot_correlation

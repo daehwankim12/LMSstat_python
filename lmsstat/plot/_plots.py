@@ -22,7 +22,7 @@ from plotnine import (
 )
 
 from ._utils import _annot, _pal, scaling, pca, plsda
-from ..stat._utils import ensure_sample_group_columns
+from ..stat._utils import ensure_sample_group_columns, correlation
 
 import gc
 import warnings
@@ -1136,3 +1136,87 @@ def plot_volcano(
             print(g)
 
     return g
+
+
+# ---------------------------------------------------------------------- #
+#                            correlation map                             #
+# ---------------------------------------------------------------------- #
+_CORR_METHODS = ("pearson", "spearman", "kendall")
+
+
+def plot_correlation(
+        data: pd.DataFrame,
+        *,
+        axis: str = "metabolite",
+        method: str = "pearson",
+        cluster: bool = True,
+        annot: bool = False,
+        cmap: str = "coolwarm",
+        out_path: str | Path = "correlation_plot.png",
+        figsize: tuple = (10, 8),
+        dpi: int = 600,
+        label_size: int = 8,
+):
+    """
+    Draw a correlation heat map from :func:`lmsstat.stat.correlation`.
+
+    Parameters
+    ----------
+    data : DataFrame
+        Wide table. Col0 = Sample, Col1 = Group, remaining = features.
+    axis : {"metabolite", "sample"}
+        Correlate features (default) or samples.
+    method : {"pearson", "spearman", "kendall"}
+        Correlation method.
+    cluster : bool
+        If True, hierarchically cluster rows/columns (seaborn ``clustermap``)
+        and return the ``ClusterGrid``. If False, draw a plain ordered heat map
+        and return the matplotlib ``Axes``.
+    annot : bool
+        Write the correlation value in each cell. Intended for small matrices.
+    cmap : str
+        Diverging colormap; the scale is fixed to [-1, 1] centered at 0 so plots
+        are visually comparable across runs.
+
+    Returns
+    -------
+    seaborn.matrix.ClusterGrid (cluster=True) or matplotlib.axes.Axes (cluster=False)
+    """
+    if method not in _CORR_METHODS:
+        raise ValueError("method must be 'pearson', 'spearman', or 'kendall'.")
+
+    corr = correlation(data, axis=axis, method=method)
+
+    if cluster:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            cg = sns.clustermap(
+                corr,
+                cmap=cmap, vmin=-1, vmax=1, center=0,
+                figsize=figsize, annot=annot,
+                xticklabels=True, yticklabels=True,
+                cbar_kws={"label": f"{method} r"},
+            )
+        ax = cg.ax_heatmap
+        result, fig = cg, cg.figure
+    else:
+        fig, ax = plt.subplots(figsize=figsize)
+        sns.heatmap(
+            corr,
+            cmap=cmap, vmin=-1, vmax=1, center=0,
+            annot=annot, square=True, ax=ax,
+            xticklabels=True, yticklabels=True,
+            cbar_kws={"label": f"{method} r"},
+        )
+        result = ax
+
+    ax.set_xticklabels(ax.get_xticklabels(), rotation=90, ha="right", fontsize=label_size)
+    ax.set_yticklabels(ax.get_yticklabels(), rotation=0, va="center", fontsize=label_size)
+
+    if out_path:
+        Path(out_path).parent.mkdir(exist_ok=True)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            fig.savefig(out_path, dpi=dpi, bbox_inches="tight")
+
+    return result

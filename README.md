@@ -109,6 +109,23 @@ print(f"R2X: {plsda_plt[1]}, R2Y: {plsda_plt[2]}, Q2: {plsda_plt[3]}")  # R2, Q2
 print(plsda_plt[4].head())  # VIP ranking (DataFrame)
 ```
 
+### VIP plot
+
+Consumes the VIP table from PLS-DA (`plot_plsda(...)[4]`) and draws the top
+features as a horizontal bar chart. The dashed line marks `vip_threshold`
+(default 1.0); bars are split at `VIP >= vip_threshold`.
+
+```python
+from lmsstat import plot
+import pandas as pd
+
+data = pd.read_csv("data.csv")
+
+vip = plot.plot_plsda(data, n_components=2)[4]  # VIP DataFrame
+plot.plot_vip(vip)                              # top 20 by VIP, saves vip_plot.png
+# plot.plot_vip(vip, top_n=10, vip_threshold=1.5)
+```
+
 ### Box plot, Bar plot
 각각 현재 작업 디렉토리 밑에 만들어진 boxplot, barplot 폴더에 자동으로 저장됨.
 

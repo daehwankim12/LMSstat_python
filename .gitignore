@@ -24,3 +24,10 @@ venv/
 .serena
 
 /.claude/
+
+# Default plot outputs (pca_plot.png, pls_da_plot.png, volcano_plot.png,
+# correlation_plot.png, heatmap.png, and the box/bar plot folders)
+*_plot.png
+heatmap.png
+/boxplot/
+/barplot/

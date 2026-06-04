@@ -22,7 +22,7 @@ from plotnine import (
 )
 
 from ._utils import _annot, _pal, scaling, pca, plsda
-from ..stat._utils import ensure_sample_group_columns
+from ..stat._utils import ensure_sample_group_columns, correlation
 
 import gc
 import warnings
@@ -1136,3 +1136,112 @@ def plot_volcano(
             print(g)
 
     return g
+
+
+# ---------------------------------------------------------------------- #
+#                            correlation map                             #
+# ---------------------------------------------------------------------- #
+_CORR_METHODS = ("pearson", "spearman", "kendall")
+
+
+def plot_correlation(
+        data: pd.DataFrame,
+        *,
+        axis: str = "metabolite",
+        method: str = "pearson",
+        cluster: bool = True,
+        annot: bool = False,
+        cmap: str = "coolwarm",
+        out_path: str | Path | None = "correlation_plot.png",
+        figsize: tuple = (10, 8),
+        dpi: int = 600,
+        label_size: int = 8,
+):
+    """
+    Draw a correlation heat map from :func:`lmsstat.stat.correlation`.
+
+    Parameters
+    ----------
+    data : DataFrame
+        Wide table. Col0 = Sample, Col1 = Group, remaining = features.
+    axis : {"metabolite", "sample"}
+        Correlate features (default) or samples. With ``"sample"`` the axes are
+        labelled with the ``Sample`` column rather than the row position.
+    method : {"pearson", "spearman", "kendall"}
+        Correlation method.
+    cluster : bool
+        If True, hierarchically cluster rows/columns (seaborn ``clustermap``)
+        and return the ``ClusterGrid``. If False, draw a plain ordered heat map
+        and return the matplotlib ``Axes``.
+    annot : bool
+        Write the correlation value in each cell. Intended for small matrices.
+    cmap : str
+        Diverging colormap; the scale is fixed to [-1, 1] centered at 0 so plots
+        are visually comparable across runs.
+    out_path : str | Path | None
+        Where to save the PNG. If None, nothing is written and the figure object
+        is returned for further use (e.g. in a notebook).
+
+    Returns
+    -------
+    seaborn.matrix.ClusterGrid (cluster=True) or matplotlib.axes.Axes (cluster=False)
+    """
+    if method not in _CORR_METHODS:
+        raise ValueError(f"method must be one of {_CORR_METHODS}.")
+
+    corr = correlation(data, axis=axis, method=method)
+
+    # stat.correlation drops Sample/Group then transposes for the sample axis,
+    # so the axes come back as row positions; relabel them with the Sample IDs.
+    if str(axis).lower() == "sample":
+        sample_ids = ensure_sample_group_columns(data)["Sample"].astype(str).to_numpy()
+        corr.index = sample_ids
+        corr.columns = sample_ids
+
+    if cluster:
+        # clustermap rejects non-finite distances; constant features/samples
+        # produce all-NaN correlation rows/columns. Drop those, then verify a
+        # clusterable, finite matrix remains.
+        off_diagonal = corr.to_numpy(dtype=float).copy()
+        np.fill_diagonal(off_diagonal, np.nan)
+        keep = ~np.isnan(off_diagonal).all(axis=1)
+        if not keep.all():
+            labels = corr.index[keep]
+            corr = corr.loc[labels, labels]
+        if corr.shape[0] < 2 or not np.isfinite(corr.to_numpy(dtype=float)).all():
+            raise ValueError(
+                "Not enough rows/columns with finite correlations to cluster "
+                "(constant or all-NaN rows/columns were dropped). Try cluster=False."
+            )
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            cg = sns.clustermap(
+                corr,
+                cmap=cmap, vmin=-1, vmax=1, center=0,
+                figsize=figsize, annot=annot,
+                xticklabels=True, yticklabels=True,
+                cbar_kws={"label": f"{method} r"},
+            )
+        ax = cg.ax_heatmap
+        result, fig = cg, cg.figure
+    else:
+        fig, ax = plt.subplots(figsize=figsize)
+        sns.heatmap(
+            corr,
+            cmap=cmap, vmin=-1, vmax=1, center=0,
+            annot=annot, square=True, ax=ax,
+            xticklabels=True, yticklabels=True,
+            cbar_kws={"label": f"{method} r"},
+        )
+        result = ax
+
+    plt.setp(ax.get_xticklabels(), rotation=90, ha="right", fontsize=label_size)
+    plt.setp(ax.get_yticklabels(), rotation=0, va="center", fontsize=label_size)
+
+    if out_path is not None:
+        Path(out_path).parent.mkdir(exist_ok=True)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            fig.savefig(out_path, dpi=dpi, bbox_inches="tight")
+
+    return result

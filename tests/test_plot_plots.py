@@ -11,6 +11,7 @@ from lmsstat.plot._plots import (
     plot_box,
     plot_bar,
     plot_volcano,
+    plot_correlation,
     FOLDER,
 )
 from lmsstat.stat._allstat import allstats
@@ -267,3 +268,81 @@ class TestPlotVolcano:
         et["p_adj"] = np.nan
         with pytest.raises(ValueError):
             plot_volcano(et)
+
+
+# ── plot_correlation ──────────────────────────────────────────────────────
+
+class TestPlotCorrelation:
+    def test_cluster_returns_clustergrid_and_saves(self, two_group_data, tmp_path):
+        from seaborn.matrix import ClusterGrid
+        out = tmp_path / "corr.png"
+        cg = plot_correlation(two_group_data, out_path=str(out))
+        assert isinstance(cg, ClusterGrid)
+        assert out.exists()
+        with open(out, "rb") as f:
+            assert f.read(4) == b"\x89PNG"
+
+    def test_no_cluster_returns_axes_and_saves(self, two_group_data, tmp_path):
+        import matplotlib.axes
+        out = tmp_path / "corr_nc.png"
+        ax = plot_correlation(two_group_data, cluster=False, out_path=str(out))
+        assert isinstance(ax, matplotlib.axes.Axes)
+        assert out.exists()
+
+    def test_axis_metabolite_shape(self, two_group_data, tmp_path):
+        # 5 metabolite columns → 5×5 correlation matrix
+        cg = plot_correlation(two_group_data, axis="metabolite", out_path=str(tmp_path / "m.png"))
+        assert cg.data2d.shape == (5, 5)
+
+    def test_axis_sample_shape(self, two_group_data, tmp_path):
+        # 20 samples → 20×20 correlation matrix
+        cg = plot_correlation(two_group_data, axis="sample", out_path=str(tmp_path / "s.png"))
+        assert cg.data2d.shape == (20, 20)
+
+    def test_invalid_axis_raises(self, two_group_data, tmp_path):
+        with pytest.raises(ValueError):
+            plot_correlation(two_group_data, axis="bogus", out_path=str(tmp_path / "x.png"))
+
+    def test_invalid_method_raises(self, two_group_data, tmp_path):
+        with pytest.raises(ValueError):
+            plot_correlation(two_group_data, method="bogus", out_path=str(tmp_path / "x.png"))
+
+    def test_annot_small_matrix(self, tmp_path):
+        df = pd.DataFrame(
+            {"Sample": ["a", "b", "c"], "Group": ["A", "A", "B"],
+             "M0": [1.0, 2.0, 3.0], "M1": [3.0, 2.0, 1.5]}
+        )
+        out = tmp_path / "annot.png"
+        plot_correlation(df, annot=True, out_path=str(out))
+        assert out.exists()
+
+    def test_cluster_drops_constant_feature(self, tmp_path):
+        df = pd.DataFrame(
+            {"Sample": [f"S{i}" for i in range(6)], "Group": ["A"] * 3 + ["B"] * 3,
+             "M0": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+             "M1": [2.0, 1.0, 4.0, 3.0, 6.0, 5.0],
+             "M2": [5.0] * 6}  # constant → NaN correlations, must be dropped
+        )
+        cg = plot_correlation(df, out_path=str(tmp_path / "c.png"))
+        assert "M2" not in list(cg.data2d.index)
+        assert cg.data2d.shape == (2, 2)
+
+    def test_cluster_too_few_finite_raises(self, tmp_path):
+        df = pd.DataFrame(
+            {"Sample": ["a", "b", "c"], "Group": ["A", "A", "B"],
+             "M0": [1.0, 2.0, 3.0], "M1": [5.0] * 3, "M2": [7.0] * 3}  # two constants
+        )
+        with pytest.raises(ValueError):
+            plot_correlation(df, out_path=str(tmp_path / "x.png"))
+
+    def test_sample_axis_labels_are_sample_ids(self, two_group_data, tmp_path):
+        cg = plot_correlation(two_group_data, axis="sample", out_path=str(tmp_path / "s.png"))
+        sample_ids = set(two_group_data.iloc[:, 0].astype(str))
+        assert set(map(str, cg.data2d.index)) == sample_ids
+
+    def test_out_path_none_no_save(self, two_group_data, tmp_path, monkeypatch):
+        from seaborn.matrix import ClusterGrid
+        monkeypatch.chdir(tmp_path)
+        cg = plot_correlation(two_group_data, out_path=None)
+        assert isinstance(cg, ClusterGrid)
+        assert not (tmp_path / "correlation_plot.png").exists()

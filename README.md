@@ -156,6 +156,23 @@ data = pd.read_csv("data.csv")
 plot.plot_heatmap(data)
 ```
 
+### Correlation plot
+
+Draws a clustered correlation heatmap (feature×feature by default). The color
+scale is fixed to `[-1, 1]` so plots stay comparable across runs. Returns the
+seaborn object (`ClusterGrid` when clustered, `Axes` otherwise) and saves a PNG.
+
+```python
+from lmsstat import plot
+import pandas as pd
+
+data = pd.read_csv("data.csv")
+
+cg = plot.plot_correlation(data)  # axis="metabolite", method="pearson", clustered
+# ax = plot.plot_correlation(data, axis="sample", method="spearman", cluster=False)
+# plot.plot_correlation(data, annot=True)  # cell values — for small matrices only
+```
+
 ### Effect-size table & Volcano plot (two groups)
 
 `effect_size_table` builds a per-feature table (means, fold change, log2FC,

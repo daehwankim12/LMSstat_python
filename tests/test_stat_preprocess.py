@@ -75,6 +75,27 @@ class TestContract:
         _ = fn(positive_with_nan)
         pd.testing.assert_frame_equal(positive_with_nan, before)
 
+    @pytest.mark.parametrize(
+        "fn",
+        [
+            lambda d: impute_missing(d, method="min"),
+            lambda d: log_transform(d),
+            lambda d: normalize(d, method="median"),
+        ],
+    )
+    def test_non_numeric_feature_coerced_to_nan(self, fn):
+        # A fully non-numeric feature column becomes all-NaN (per _split contract);
+        # none of the three functions can manufacture a value for it.
+        df = pd.DataFrame(
+            {"Sample": ["a", "b"], "Group": ["A", "B"],
+             "Met_0": ["x", "y"], "Met_1": [1.0, 2.0]}
+        )
+        out = fn(df)
+        assert list(out.columns) == list(df.columns)
+        assert out["Sample"].tolist() == ["a", "b"]
+        assert out["Group"].tolist() == ["A", "B"]
+        assert out["Met_0"].isna().all()
+
 
 # ── impute_missing ─────────────────────────────────────────────────────────
 
@@ -137,6 +158,26 @@ class TestImputeMissing:
     def test_single_group(self, single_group_data):
         out = impute_missing(single_group_data, method="min")
         assert out["Met_0"].isna().sum() == 0
+
+    def test_knn_single_sample_does_not_error(self):
+        # n_neighbors = max(1, min(5, 0)) = 1; must not crash on one sample.
+        df = pd.DataFrame(
+            {"Sample": ["a"], "Group": ["A"], "Met_0": [5.0], "Met_1": [7.0]}
+        )
+        out = impute_missing(df, method="knn")
+        assert out.shape == df.shape
+        assert np.isfinite(out.iloc[:, 2:].to_numpy(dtype=float)).all()
+
+    def test_knn_all_nan_row(self):
+        # A fully-missing sample is filled from observed columns (sklearn falls
+        # back to column means) — codify "no crash, shape preserved, finite".
+        df = pd.DataFrame(
+            {"Sample": ["a", "b", "c"], "Group": ["A", "A", "B"],
+             "Met_0": [np.nan, 2.0, 3.0], "Met_1": [np.nan, 5.0, 6.0]}
+        )
+        out = impute_missing(df, method="knn")
+        assert out.shape == df.shape
+        assert np.isfinite(out.iloc[:, 2:].to_numpy(dtype=float)).all()
 
     def test_invalid_method_raises(self, simple_data):
         with pytest.raises(ValueError):
@@ -235,6 +276,26 @@ class TestNormalize:
         out = normalize(df, method="median")
         # NaN stays NaN; observed entries finite
         assert np.isnan(out.loc[1, "Met_0"])
+
+    @pytest.mark.parametrize("method", ["median", "total_area", "pqn"])
+    def test_all_nan_row_preserved(self, method):
+        df = pd.DataFrame(
+            {"Sample": ["a", "b"], "Group": ["A", "B"],
+             "Met_0": [np.nan, 2.0], "Met_1": [np.nan, 4.0]}
+        )
+        out = normalize(df, method=method)
+        assert out.loc[0, ["Met_0", "Met_1"]].isna().all()
+        assert not np.isinf(out.iloc[:, 2:].to_numpy(dtype=float)).any()
+
+    @pytest.mark.parametrize("method", ["median", "total_area", "pqn"])
+    def test_all_nan_feature_column_preserved(self, method):
+        df = pd.DataFrame(
+            {"Sample": ["a", "b"], "Group": ["A", "B"],
+             "Met_0": [np.nan, np.nan], "Met_1": [1.0, 2.0]}
+        )
+        out = normalize(df, method=method)
+        assert out["Met_0"].isna().all()
+        assert not np.isinf(out.iloc[:, 2:].to_numpy(dtype=float)).any()
 
     def test_invalid_method_raises(self, simple_data):
         with pytest.raises(ValueError):

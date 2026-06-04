@@ -84,6 +84,11 @@ class TestAllstatsPosthocOption:
         with pytest.raises(ValueError):
             allstats(three_group_data, posthoc="tukey")
 
+    def test_invalid_posthoc_raises_for_two_groups(self, two_group_data):
+        # Validated up front, even though two-group data never runs post-hoc.
+        with pytest.raises(ValueError):
+            allstats(two_group_data, posthoc="tukey")
+
     def test_posthoc_noop_for_two_groups(self, two_group_data):
         # No post-hoc columns for two groups regardless of the option.
         result = allstats(two_group_data, posthoc="games_howell")
@@ -106,9 +111,11 @@ class TestAllstatsAnovaUseVar:
         assert result.min().min() >= 0.0
         assert result.max().max() <= 1.0
 
-    def test_equal_vs_unequal_differ(self, three_group_data):
-        eq = allstats(three_group_data, anova_use_var="equal", p_adj=False)
-        un = allstats(three_group_data, anova_use_var="unequal", p_adj=False)
+    def test_equal_vs_unequal_differ(self, heteroscedastic_data):
+        # Unequal variances + unequal group sizes make Welch and classic ANOVA
+        # diverge for a principled reason, not just sampling noise.
+        eq = allstats(heteroscedastic_data, anova_use_var="equal", p_adj=False)
+        un = allstats(heteroscedastic_data, anova_use_var="unequal", p_adj=False)
         assert not np.allclose(eq["p-value_ANOVA"].values, un["p-value_ANOVA"].values)
 
     def test_invalid_use_var_raises(self, three_group_data):

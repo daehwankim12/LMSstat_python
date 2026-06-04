@@ -199,3 +199,13 @@ class TestPlotBar:
         from pathlib import Path
         created = list(Path(outdir).glob("*.png"))
         assert len(created) > 0
+
+    def test_games_howell_test_type(self, three_group_data, tmp_path, monkeypatch):
+        stats = allstats(three_group_data, p_adj=False, posthoc="games_howell")
+        outdir = str(tmp_path / "bar_gh")
+        monkeypatch.setitem(FOLDER, "bar", outdir)
+        result = plot_bar(three_group_data, stats, test_type="games_howell", max_workers=1)
+        assert result is None
+        from pathlib import Path
+        created = list(Path(outdir).glob("*.png"))
+        assert len(created) > 0

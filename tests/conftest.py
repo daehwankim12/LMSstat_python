@@ -50,6 +50,27 @@ def three_group_data():
 
 
 @pytest.fixture()
+def heteroscedastic_data():
+    """Three groups with very different variances and unequal sizes.
+
+    Welch's ANOVA and the classic equal-variance ANOVA diverge meaningfully
+    here (not just by sampling noise), so it is a fair test of use_var.
+    """
+    rng = np.random.default_rng(7)
+    specs = [("X", 12, 0.0, 0.5), ("Y", 8, 0.5, 3.0), ("Z", 20, 1.0, 8.0)]
+    rows = []
+    idx = 0
+    for g, n, mu, sd in specs:
+        for _ in range(n):
+            row = {"Sample": f"H{idx:03d}", "Group": g}
+            for j in range(5):
+                row[f"Met_{j}"] = rng.normal(mu, sd)
+            rows.append(row)
+            idx += 1
+    return pd.DataFrame(rows)
+
+
+@pytest.fixture()
 def preprocessed_two_groups(two_group_data):
     raw, gs, names = preprocess_data(two_group_data)
     return two_group_data, raw, gs, names

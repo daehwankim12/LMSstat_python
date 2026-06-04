@@ -161,8 +161,8 @@ class TestAnovaTest:
         assert result.min().min() >= 0.0
         assert result.max().max() <= 1.0
 
-    def test_equal_vs_unequal_differ(self, preprocessed_three_groups):
-        _, _, gs, names = preprocessed_three_groups
+    def test_equal_vs_unequal_differ(self, heteroscedastic_data):
+        _, gs, names = preprocess_data(heteroscedastic_data)
         eq = anova_test(gs, names, use_var="equal")
         un = anova_test(gs, names, use_var="unequal")
         assert not np.allclose(eq.values, un.values)

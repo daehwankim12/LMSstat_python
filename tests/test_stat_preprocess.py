@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from lmsstat.stat._preprocess import impute_missing, log_transform, normalize
+from lmsstat.stat._preprocess import impute_missing, log_transform, normalize, rsd_filter
 
 
 @pytest.fixture()
@@ -317,3 +317,97 @@ class TestNormalize:
     def test_invalid_method_raises(self, simple_data):
         with pytest.raises(ValueError):
             normalize(simple_data, method="bogus")
+
+
+# ── rsd_filter ──────────────────────────────────────────────────────────────
+
+@pytest.fixture()
+def qc_data():
+    # QC %RSD per feature (over the 3 QC rows):
+    #   Met_0: [10,12,8]   -> mean 10, sd 2  -> 20%
+    #   Met_1: [100,100,100] -> constant     -> 0%
+    #   Met_2: [1,5,9]     -> mean 5,  sd 4  -> 80%
+    return pd.DataFrame(
+        {
+            "Sample": [f"S{i}" for i in range(9)],
+            "Group": ["QC", "QC", "QC", "A", "A", "A", "B", "B", "B"],
+            "Met_0": [10.0, 12.0, 8.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+            "Met_1": [100.0, 100.0, 100.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+            "Met_2": [1.0, 5.0, 9.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+        }
+    )
+
+
+class TestRsdFilter:
+    def test_keeps_and_drops_by_threshold(self, qc_data):
+        out = rsd_filter(qc_data, max_rsd=30.0)
+        assert list(out.columns) == ["Sample", "Group", "Met_0", "Met_1"]  # Met_2 (80%) dropped
+        assert out.shape[0] == qc_data.shape[0]  # samples untouched
+
+    def test_constant_qc_feature_kept(self, qc_data):
+        out = rsd_filter(qc_data, max_rsd=30.0)
+        assert "Met_1" in out.columns  # 0% RSD
+
+    def test_return_rsd_series(self, qc_data):
+        out, rsd = rsd_filter(qc_data, max_rsd=30.0, return_rsd=True)
+        assert list(rsd.index) == ["Met_0", "Met_1", "Met_2"]  # all original features
+        assert rsd["Met_0"] == pytest.approx(20.0)
+        assert rsd["Met_1"] == pytest.approx(0.0)
+        assert rsd["Met_2"] == pytest.approx(80.0)
+
+    def test_preserves_sample_group_and_order(self, qc_data):
+        out = rsd_filter(qc_data, max_rsd=200.0)  # keep everything
+        assert list(out.columns) == list(qc_data.columns)
+        assert out["Sample"].tolist() == qc_data["Sample"].tolist()
+        assert out["Group"].tolist() == qc_data["Group"].tolist()
+
+    def test_does_not_mutate_input(self, qc_data):
+        before = qc_data.copy(deep=True)
+        _ = rsd_filter(qc_data, max_rsd=30.0)
+        pd.testing.assert_frame_equal(qc_data, before)
+
+    def test_missing_qc_label_raises(self, qc_data):
+        with pytest.raises(ValueError):
+            rsd_filter(qc_data, qc_label="POOL")
+
+    def test_fewer_than_two_qc_raises(self):
+        df = pd.DataFrame(
+            {"Sample": ["q", "a", "b"], "Group": ["QC", "A", "B"],
+             "Met_0": [10.0, 1.0, 2.0]}
+        )
+        with pytest.raises(ValueError):
+            rsd_filter(df)
+
+    @pytest.mark.parametrize("bad", [-1.0, np.nan, np.inf])
+    def test_invalid_max_rsd_raises(self, qc_data, bad):
+        with pytest.raises(ValueError):
+            rsd_filter(qc_data, max_rsd=bad)
+
+    def test_qc_nonpositive_mean_dropped(self):
+        df = pd.DataFrame(
+            {"Sample": [f"S{i}" for i in range(6)],
+             "Group": ["QC", "QC", "QC", "A", "A", "B"],
+             "Met_0": [-1.0, -2.0, -3.0, 1.0, 2.0, 3.0]}  # QC mean -2 -> dropped
+        )
+        out = rsd_filter(df, max_rsd=30.0)
+        assert "Met_0" not in out.columns
+
+    def test_nan_tolerant(self):
+        df = pd.DataFrame(
+            {"Sample": [f"S{i}" for i in range(4)],
+             "Group": ["QC", "QC", "QC", "A"],
+             "Met_0": [10.0, 12.0, np.nan, 5.0],   # QC [10,12] -> ~12.9% -> keep
+             "Met_1": [10.0, np.nan, np.nan, 5.0]}  # only 1 finite QC -> dropped
+        )
+        out = rsd_filter(df, max_rsd=30.0)
+        assert "Met_0" in out.columns
+        assert "Met_1" not in out.columns
+
+    def test_all_features_dropped_returns_empty_features(self):
+        df = pd.DataFrame(
+            {"Sample": ["q1", "q2", "a", "b"], "Group": ["QC", "QC", "A", "B"],
+             "M0": [1.0, 9.0, 2.0, 3.0], "M1": [2.0, 18.0, 2.0, 3.0]}  # QC RSD ~113%
+        )
+        out = rsd_filter(df, max_rsd=5.0)
+        assert list(out.columns) == ["Sample", "Group"]
+        assert out.shape[0] == 4

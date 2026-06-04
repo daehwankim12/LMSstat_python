@@ -69,6 +69,12 @@ from lmsstat import stat
 
 data = pd.read_csv("data.csv")
 
+# QC/RSD feature filtering: drop features whose %RSD across the QC samples
+# (Group == qc_label) exceeds max_rsd. Filters features only; samples untouched.
+data = stat.rsd_filter(data, qc_label="QC", max_rsd=30)
+# inspect what was dropped:
+# data, rsd = stat.rsd_filter(data, qc_label="QC", max_rsd=30, return_rsd=True)
+
 # Missing-value imputation: "half_min" (LC-MS below-LOD), "min", or "knn"
 data = stat.impute_missing(data, method="half_min")
 
@@ -79,8 +85,9 @@ data = stat.normalize(data, method="pqn")
 data = stat.log_transform(data, base=2, offset=1.0)
 ```
 
-A typical order is impute → normalize → log transform → `scaling`, after which
-`allstats`, volcano/PLS-DA, and the heatmap operate on cleaner inputs.
+A typical order is QC/RSD filter → impute → normalize → log transform →
+`scaling`, after which `allstats`, volcano/PLS-DA, and the heatmap operate on
+cleaner inputs.
 
 ### PCA
 

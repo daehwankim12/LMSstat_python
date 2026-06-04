@@ -12,6 +12,7 @@ from lmsstat.plot._plots import (
     plot_bar,
     plot_volcano,
     plot_correlation,
+    plot_vip,
     FOLDER,
 )
 from lmsstat.stat._allstat import allstats
@@ -346,3 +347,73 @@ class TestPlotCorrelation:
         cg = plot_correlation(two_group_data, out_path=None)
         assert isinstance(cg, ClusterGrid)
         assert not (tmp_path / "correlation_plot.png").exists()
+
+
+# ── plot_vip ──────────────────────────────────────────────────────────────
+
+def _vip_df(n=30, seed=0):
+    rng = np.random.default_rng(seed)
+    return pd.DataFrame(
+        {"VIP": rng.uniform(0.0, 3.0, n)},
+        index=[f"M{i:02d}" for i in range(n)],
+    )
+
+
+class TestPlotVip:
+    def test_returns_object_and_saves_png(self, tmp_path):
+        save = tmp_path / "vip.png"
+        g = plot_vip(_vip_df(), save_path=str(save))
+        assert g is not None
+        assert save.exists()
+        with open(save, "rb") as f:
+            assert f.read(4) == b"\x89PNG"
+
+    def test_top_n_limits_rows(self, tmp_path):
+        g = plot_vip(_vip_df(n=30), top_n=10, save_path=str(tmp_path / "v.png"))
+        assert len(g.data) == 10
+
+    def test_top_n_larger_than_n_shows_all(self, tmp_path):
+        g = plot_vip(_vip_df(n=8), top_n=50, save_path=str(tmp_path / "v.png"))
+        assert len(g.data) == 8
+
+    def test_selects_highest_vip(self, tmp_path):
+        df = pd.DataFrame({"VIP": [0.2, 2.5, 1.1, 0.9]}, index=["a", "b", "c", "d"])
+        g = plot_vip(df, top_n=2, save_path=str(tmp_path / "v.png"))
+        assert set(g.data["feature"]) == {"b", "c"}
+
+    def test_missing_vip_column_raises(self, tmp_path):
+        df = pd.DataFrame({"score": [1.0, 2.0]}, index=["a", "b"])
+        with pytest.raises(ValueError):
+            plot_vip(df, save_path=str(tmp_path / "v.png"))
+
+    def test_invalid_top_n_raises(self, tmp_path):
+        for bad in (0, -3, 2.5):
+            with pytest.raises((ValueError, TypeError)):
+                plot_vip(_vip_df(), top_n=bad, save_path=str(tmp_path / "v.png"))
+
+    def test_non_finite_vip_dropped(self, tmp_path):
+        df = pd.DataFrame({"VIP": [2.0, np.nan, np.inf, 1.0]}, index=["a", "b", "c", "d"])
+        g = plot_vip(df, save_path=str(tmp_path / "v.png"))
+        assert set(g.data["feature"]) == {"a", "d"}
+
+    def test_all_non_finite_raises(self, tmp_path):
+        df = pd.DataFrame({"VIP": [np.nan, np.inf]}, index=["a", "b"])
+        with pytest.raises(ValueError):
+            plot_vip(df, save_path=str(tmp_path / "v.png"))
+
+    def test_invalid_threshold_raises(self, tmp_path):
+        for bad in (-1.0, np.nan, np.inf):
+            with pytest.raises(ValueError):
+                plot_vip(_vip_df(), vip_threshold=bad, save_path=str(tmp_path / "v.png"))
+
+    def test_input_not_mutated(self, tmp_path):
+        df = _vip_df()
+        before = df.copy(deep=True)
+        _ = plot_vip(df, save_path=str(tmp_path / "v.png"))
+        pd.testing.assert_frame_equal(df, before)
+
+    def test_consumes_plsda_vip_table(self, two_group_data, tmp_path):
+        from lmsstat.plot._utils import plsda
+        *_, vip_df = plsda(two_group_data, n_components=2)
+        g = plot_vip(vip_df, save_path=str(tmp_path / "v.png"))
+        assert g is not None

@@ -18,7 +18,8 @@ from plotnine import (
     scale_fill_manual, scale_x_discrete, scale_y_continuous,
     theme_classic, theme, geom_bar, geom_errorbar, labs,
     scale_color_manual, theme_minimal, element_text, stat_ellipse,
-    geom_text, scale_x_continuous, geom_hline, geom_vline
+    geom_text, scale_x_continuous, geom_hline, geom_vline,
+    geom_col, coord_flip
 )
 
 from ._utils import _annot, _pal, scaling, pca, plsda
@@ -1245,3 +1246,104 @@ def plot_correlation(
             fig.savefig(out_path, dpi=dpi, bbox_inches="tight")
 
     return result
+
+
+# ---------------------------------------------------------------------- #
+#                                VIP plot                                #
+# ---------------------------------------------------------------------- #
+def plot_vip(
+        vip: pd.DataFrame,
+        *,
+        top_n: int = 20,
+        vip_threshold: float = 1.0,
+        color_by_threshold: bool = True,
+        save_path: str | Path = "vip_plot.png",
+        dpi: int = 600,
+        figsize: tuple = (8, 6),
+        show: bool = False,
+):
+    """
+    Draw a VIP bar chart from a PLS-DA VIP table.
+
+    Pure consumer of the ``VIP`` table produced by
+    :func:`lmsstat.stat` PLS-DA (``vip_df``: a DataFrame indexed by feature with
+    a ``VIP`` column). Computes no statistics.
+
+    Parameters
+    ----------
+    vip : DataFrame
+        Indexed by feature name, with a ``VIP`` column. Non-finite VIP values
+        are dropped; a ValueError is raised if none remain.
+    top_n : int
+        Number of top features (by VIP, descending) to show. Must be a positive
+        integer; if it exceeds the number of features, all are shown.
+    vip_threshold : float
+        Reference cutoff (finite, non-negative). Drawn as a dashed line; with
+        ``color_by_threshold`` bars are split at ``VIP >= vip_threshold``.
+
+    Returns
+    -------
+    plotnine.ggplot
+    """
+    if isinstance(top_n, bool) or not isinstance(top_n, (int, np.integer)) or top_n <= 0:
+        raise ValueError("top_n must be a positive integer.")
+    if not (np.isfinite(vip_threshold) and vip_threshold >= 0):
+        raise ValueError("vip_threshold must be a finite, non-negative number.")
+    if "VIP" not in vip.columns:
+        raise ValueError("vip must have a 'VIP' column.")
+
+    # Build a plotting copy so the caller's table is never mutated; feature
+    # names come from the index.
+    df = pd.DataFrame(
+        {
+            "feature": vip.index.astype(str),
+            "VIP": pd.to_numeric(vip["VIP"], errors="coerce").to_numpy(dtype=float),
+        }
+    )
+    df = df[np.isfinite(df["VIP"].to_numpy(dtype=float))]
+    if df.empty:
+        raise ValueError("No finite VIP values to plot.")
+
+    df = df.sort_values("VIP", ascending=False).head(int(top_n)).reset_index(drop=True)
+    # Order ascending so the largest VIP sits at the top after coord_flip.
+    order = df.sort_values("VIP", ascending=True)["feature"].tolist()
+    df["feature"] = pd.Categorical(df["feature"], categories=order, ordered=True)
+
+    thr_label = f"{vip_threshold:g}"
+    if color_by_threshold:
+        df["band"] = df["VIP"] >= vip_threshold
+        g = (
+                ggplot(df, aes("feature", "VIP", fill="band"))
+                + geom_col()
+                + scale_fill_manual(
+            values={False: "#9e9e9e", True: "#c0392b"},
+            labels=[f"< {thr_label}", f">= {thr_label}"],
+            name="VIP",
+        )
+        )
+    else:
+        g = ggplot(df, aes("feature", "VIP")) + geom_col(fill="#4c72b0")
+
+    g = (
+            g
+            + geom_hline(yintercept=vip_threshold, linetype="dashed", color="grey", size=0.4)
+            + coord_flip()
+            + labs(x="", y="VIP")
+            + theme_minimal(base_size=11)
+            + theme(plot_title=element_text(weight="bold", ha="center"))
+    )
+
+    if save_path:
+        Path(save_path).parent.mkdir(exist_ok=True)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            fig = g.draw()
+            fig.set_size_inches(*figsize)
+            fig.savefig(save_path, dpi=dpi, bbox_inches="tight")
+        plt.close(fig)
+    if show:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            print(g)
+
+    return g

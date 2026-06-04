@@ -433,3 +433,8 @@ class TestPlotVip:
         g = plot_vip(_vip_df(), save_path=None)
         assert g is not None
         assert not (tmp_path / "vip_plot.png").exists()
+
+    def test_show_branch_runs(self):
+        # Smoke test for the interactive show=True branch (Agg backend).
+        g = plot_vip(_vip_df(n=5), save_path=None, show=True)
+        assert g is not None

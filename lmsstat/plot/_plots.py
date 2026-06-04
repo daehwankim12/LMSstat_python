@@ -1257,7 +1257,7 @@ def plot_vip(
         top_n: int = 20,
         vip_threshold: float = 1.0,
         color_by_threshold: bool = True,
-        save_path: str | Path = "vip_plot.png",
+        save_path: str | Path | None = "vip_plot.png",
         dpi: int = 600,
         figsize: tuple = (8, 6),
         show: bool = False,
@@ -1280,6 +1280,9 @@ def plot_vip(
     vip_threshold : float
         Reference cutoff (finite, non-negative). Drawn as a dashed line; with
         ``color_by_threshold`` bars are split at ``VIP >= vip_threshold``.
+    save_path : str | Path | None
+        Where to save the PNG. If None, nothing is written and the ggplot is
+        returned for further use.
 
     Returns
     -------
@@ -1311,13 +1314,19 @@ def plot_vip(
 
     thr_label = f"{vip_threshold:g}"
     if color_by_threshold:
-        df["band"] = df["VIP"] >= vip_threshold
+        low, high = f"< {thr_label}", f">= {thr_label}"
+        # Explicit ordered categorical with both categories fixed, so the legend
+        # mapping is correct even when every shown feature is on one side.
+        df["band"] = pd.Categorical(
+            np.where(df["VIP"].to_numpy(dtype=float) >= vip_threshold, high, low),
+            categories=[low, high],
+            ordered=True,
+        )
         g = (
                 ggplot(df, aes("feature", "VIP", fill="band"))
                 + geom_col()
                 + scale_fill_manual(
-            values={False: "#9e9e9e", True: "#c0392b"},
-            labels=[f"< {thr_label}", f">= {thr_label}"],
+            values={low: "#9e9e9e", high: "#c0392b"},
             name="VIP",
         )
         )
@@ -1333,7 +1342,7 @@ def plot_vip(
             + theme(plot_title=element_text(weight="bold", ha="center"))
     )
 
-    if save_path:
+    if save_path is not None:
         Path(save_path).parent.mkdir(exist_ok=True)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", UserWarning)

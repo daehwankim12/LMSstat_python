@@ -417,3 +417,19 @@ class TestPlotVip:
         *_, vip_df = plsda(two_group_data, n_components=2)
         g = plot_vip(vip_df, save_path=str(tmp_path / "v.png"))
         assert g is not None
+
+    def test_band_categories_preserved_all_above(self, tmp_path):
+        df = pd.DataFrame({"VIP": [1.5, 2.0, 3.0]}, index=["a", "b", "c"])
+        g = plot_vip(df, vip_threshold=1.0, save_path=str(tmp_path / "v.png"))
+        assert list(g.data["band"].cat.categories) == ["< 1", ">= 1"]
+
+    def test_band_categories_preserved_all_below(self, tmp_path):
+        df = pd.DataFrame({"VIP": [0.1, 0.2, 0.3]}, index=["a", "b", "c"])
+        g = plot_vip(df, vip_threshold=1.0, save_path=str(tmp_path / "v.png"))
+        assert list(g.data["band"].cat.categories) == ["< 1", ">= 1"]
+
+    def test_save_path_none_no_save(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        g = plot_vip(_vip_df(), save_path=None)
+        assert g is not None
+        assert not (tmp_path / "vip_plot.png").exists()

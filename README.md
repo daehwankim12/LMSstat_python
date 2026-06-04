@@ -20,6 +20,12 @@ data = pd.read_csv("data.csv")
 result = stat.allstats(data)
 # result = stat.allstats(data, p_adj=False) # When you don't want to adjust p-value
 
+# For 3+ groups you can choose the ANOVA variance assumption and the parametric
+# post-hoc test explicitly (the non-parametric Dunn post-hoc is always included):
+# result = stat.allstats(data, anova_use_var="unequal")           # Welch's ANOVA
+# result = stat.allstats(data, posthoc="games_howell")            # Games-Howell instead of Scheffé
+# result = stat.allstats(data, posthoc="both")                    # both Scheffé and Games-Howell
+
 result.to_csv('result.csv', index=False)  # Save the result as a csv file
 ```
 
@@ -92,6 +98,12 @@ stats_res = stat.allstats(data)
 
 plot.plot_box(data, stats_res, test_type="t-test")
 plot.plot_bar(data, stats_res, test_type="t-test")
+
+# test_type selects which p-value column drives the significance brackets:
+# "t-test", "u-test", "scheffe", "games_howell" (3+ groups), or "dunn".
+# Use the same post-hoc you requested in allstats(); e.g. for games_howell:
+# stats_res = stat.allstats(data, posthoc="games_howell")
+# plot.plot_box(data, stats_res, test_type="games_howell")
 
 # plot only significant metabolites for the selected test (default alpha=0.05)
 # plot.plot_box(data, stats_res, test_type="t-test", significant_only=True)

@@ -156,6 +156,21 @@ class TestPlotBox:
         created = list(Path(outdir).glob("*.png"))
         assert len(created) > 0
 
+    def test_games_howell_test_type(self, three_group_data, tmp_path, monkeypatch):
+        stats = allstats(three_group_data, p_adj=False, posthoc="games_howell")
+        outdir = str(tmp_path / "box_gh")
+        monkeypatch.setitem(FOLDER, "box", outdir)
+        result = plot_box(three_group_data, stats, test_type="games_howell", max_workers=1)
+        assert result is None
+        from pathlib import Path
+        created = list(Path(outdir).glob("*.png"))
+        assert len(created) > 0
+
+    def test_invalid_test_type_raises(self, two_group_data):
+        stats = allstats(two_group_data, p_adj=False)
+        with pytest.raises(ValueError):
+            plot_box(two_group_data, stats, test_type="tukey", max_workers=1)
+
     def test_significant_only_filters(self, two_group_data, tmp_path, monkeypatch):
         stats = allstats(two_group_data, p_adj=False)
         outdir_all = str(tmp_path / "box_all")

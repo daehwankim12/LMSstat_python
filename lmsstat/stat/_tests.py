@@ -184,17 +184,22 @@ def u_test(groups_split, metabolite_names) -> pd.DataFrame:
     return df_utest
 
 
-def anova_test(groups_split, metabolite_names) -> pd.DataFrame:
+def anova_test(groups_split, metabolite_names, use_var="equal") -> pd.DataFrame:
     """
     Perform an ANOVA test on groups of data using statsmodels.stats.oneway.anova_oneway.
 
     Args:
         groups_split (pandas.core.groupby.DataFrameGroupBy): A grouped DataFrame object containing the groups to compare.
         metabolite_names (List[str]): A list of metabolite names.
+        use_var ({"equal", "unequal"}): Variance assumption. "equal" runs the
+            classic one-way ANOVA; "unequal" runs Welch's ANOVA. Defaults to "equal".
 
     Returns:
         anova_results (pandas.core.frame.DataFrame): A DataFrame containing the p-value for each metabolite.
     """
+    if use_var not in ("equal", "unequal"):
+        raise ValueError("use_var must be 'equal' or 'unequal'.")
+
     df = groups_split.obj
     groups = df["Group"].values
 
@@ -217,7 +222,7 @@ def anova_test(groups_split, metabolite_names) -> pd.DataFrame:
             continue
 
         try:
-            anova_result = anova_oneway(x_valid, g_valid, use_var="equal")
+            anova_result = anova_oneway(x_valid, g_valid, use_var=use_var)
             p = float(anova_result.pvalue)
         except Exception:
             p = 1.0

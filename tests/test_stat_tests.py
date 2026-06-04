@@ -154,6 +154,24 @@ class TestAnovaTest:
         idx = names.index("Met_4")
         assert result.iloc[idx, 0] == 1.0
 
+    def test_unequal_var_runs(self, preprocessed_three_groups):
+        _, _, gs, names = preprocessed_three_groups
+        result = anova_test(gs, names, use_var="unequal")
+        assert result.shape == (5, 1)
+        assert result.min().min() >= 0.0
+        assert result.max().max() <= 1.0
+
+    def test_equal_vs_unequal_differ(self, preprocessed_three_groups):
+        _, _, gs, names = preprocessed_three_groups
+        eq = anova_test(gs, names, use_var="equal")
+        un = anova_test(gs, names, use_var="unequal")
+        assert not np.allclose(eq.values, un.values)
+
+    def test_invalid_use_var_raises(self, preprocessed_three_groups):
+        _, _, gs, names = preprocessed_three_groups
+        with pytest.raises(ValueError):
+            anova_test(gs, names, use_var="bogus")
+
 
 # ── kruskal_test ────────────────────────────────────────────────────────
 

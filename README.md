@@ -155,3 +155,31 @@ data = pd.read_csv("data.csv")
 
 plot.plot_heatmap(data)
 ```
+
+### Effect-size table & Volcano plot (two groups)
+
+`effect_size_table` builds a per-feature table (means, fold change, log2FC,
+Cohen's d, p-value, BH-adjusted p-value) for a two-group comparison.
+`plot_volcano` consumes that table — it does not compute statistics itself.
+
+```python
+from lmsstat import stat, plot
+import pandas as pd
+
+data = pd.read_csv("data.csv")  # exactly two groups
+
+eff = stat.effect_size_table(data)
+# choose the test and direction explicitly:
+# eff = stat.effect_size_table(data, p_source="u-test", group_order=["Ctrl", "Case"])
+# reuse a precomputed (unadjusted) allstats result:
+# eff = stat.effect_size_table(data, stats_res=stat.allstats(data, p_adj=False))
+
+eff.head()  # feature, group1, group2, mean1, mean2, fold_change, log2fc, cohens_d, p_value, p_adj
+
+plot.plot_volcano(eff)  # saves volcano_plot.png
+# plot.plot_volcano(eff, log2fc_threshold=1.0, p_threshold=0.05, use_adjusted=True)
+```
+
+`fold_change` / `log2fc` are reported only when both group means are strictly
+positive (raw, non-negative intensity data); otherwise they are `NaN` — no
+pseudocount is applied.

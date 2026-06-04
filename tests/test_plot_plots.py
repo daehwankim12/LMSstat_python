@@ -10,9 +10,11 @@ from lmsstat.plot._plots import (
     plot_heatmap,
     plot_box,
     plot_bar,
+    plot_volcano,
     FOLDER,
 )
 from lmsstat.stat._allstat import allstats
+from lmsstat.stat._effect import effect_size_table
 
 
 pytestmark = pytest.mark.slow
@@ -209,3 +211,44 @@ class TestPlotBar:
         from pathlib import Path
         created = list(Path(outdir).glob("*.png"))
         assert len(created) > 0
+
+
+# ── plot_volcano ────────────────────────────────────────────────────────
+
+class TestPlotVolcano:
+    def test_returns_object_and_saves_png(self, two_group_data, tmp_path):
+        et = effect_size_table(two_group_data)
+        save = tmp_path / "volcano.png"
+        g = plot_volcano(et, save_path=str(save))
+        assert g is not None
+        assert save.exists()
+        with open(save, "rb") as f:
+            assert f.read(4) == b"\x89PNG"
+
+    def test_use_adjusted_false_runs(self, two_group_data, tmp_path):
+        et = effect_size_table(two_group_data)
+        save = tmp_path / "volcano_raw.png"
+        plot_volcano(et, use_adjusted=False, save_path=str(save))
+        assert save.exists()
+
+    def test_missing_columns_raises(self):
+        with pytest.raises(ValueError):
+            plot_volcano(pd.DataFrame({"x": [1.0], "y": [2.0]}))
+
+    def test_invalid_log2fc_threshold_raises(self, two_group_data):
+        et = effect_size_table(two_group_data)
+        with pytest.raises(ValueError):
+            plot_volcano(et, log2fc_threshold=-1.0)
+
+    def test_invalid_p_threshold_raises(self, two_group_data):
+        et = effect_size_table(two_group_data)
+        with pytest.raises(ValueError):
+            plot_volcano(et, p_threshold=2.0)
+
+    def test_zero_pvalue_no_inf(self, two_group_data, tmp_path):
+        et = effect_size_table(two_group_data)
+        et.loc[et.index[0], "p_adj"] = 0.0  # force a zero p-value
+        save = tmp_path / "volcano_zero.png"
+        # Should floor p for plotting and not raise on -log10(0).
+        plot_volcano(et, save_path=str(save))
+        assert save.exists()

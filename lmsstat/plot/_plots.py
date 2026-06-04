@@ -18,7 +18,7 @@ from plotnine import (
     scale_fill_manual, scale_x_discrete, scale_y_continuous,
     theme_classic, theme, geom_bar, geom_errorbar, labs,
     scale_color_manual, theme_minimal, element_text, stat_ellipse,
-    geom_text, scale_x_continuous
+    geom_text, scale_x_continuous, geom_hline, geom_vline
 )
 
 from ._utils import _annot, _pal, scaling, pca, plsda
@@ -1018,3 +1018,111 @@ def plot_plsda(
     vips = vip_df.sort_values(by="VIP", ascending=False)
 
     return g, r2x, r2y, q2, vips
+
+
+# ---------------------------------------------------------------------- #
+#                               volcano                                  #
+# ---------------------------------------------------------------------- #
+_VOLCANO_COLORS = {"Up": "#c0392b", "Down": "#2c7fb8", "NS": "#9e9e9e"}
+
+
+def plot_volcano(
+        eff_table: pd.DataFrame,
+        *,
+        log2fc_threshold: float = 1.0,
+        p_threshold: float = 0.05,
+        use_adjusted: bool = True,
+        save_path: str | Path = "volcano_plot.png",
+        dpi: int = 600,
+        point_size: float = 2.0,
+        show: bool = False,
+):
+    """
+    Draw a volcano plot from an :func:`lmsstat.stat.effect_size_table` result.
+
+    Consumes the table only — no statistics are computed here. x = log2fc,
+    y = -log10(p) where p is ``p_adj`` (``use_adjusted=True``) or ``p_value``.
+
+    Parameters
+    ----------
+    eff_table : DataFrame
+        Must contain ``log2fc``, ``p_value`` and ``p_adj`` columns.
+    log2fc_threshold : float
+        |log2fc| cutoff for the dashed vertical guides and Up/Down coloring (>= 0).
+    p_threshold : float
+        p-value cutoff for the dashed horizontal guide and significance (in [0, 1]).
+    use_adjusted : bool
+        Use ``p_adj`` (default) or the raw ``p_value`` for the y-axis and cutoff.
+
+    Returns
+    -------
+    plotnine.ggplot
+    """
+    if not (np.isfinite(log2fc_threshold) and log2fc_threshold >= 0):
+        raise ValueError("log2fc_threshold must be a finite value >= 0.")
+    if not (0.0 <= p_threshold <= 1.0):
+        raise ValueError("p_threshold must be in [0, 1].")
+
+    required = {"log2fc", "p_value", "p_adj"}
+    if not required.issubset(eff_table.columns):
+        missing = ", ".join(sorted(required - set(eff_table.columns)))
+        raise ValueError(f"eff_table is missing required column(s): {missing}.")
+
+    pcol = "p_adj" if use_adjusted else "p_value"
+    df = pd.DataFrame(
+        {
+            "log2fc": pd.to_numeric(eff_table["log2fc"], errors="coerce"),
+            "p": pd.to_numeric(eff_table[pcol], errors="coerce"),
+        }
+    )
+    # Drop features without a placeable x value (e.g. non-positive means).
+    df = df[np.isfinite(df["log2fc"].to_numpy(dtype=float))].copy()
+
+    p_vals = df["p"].to_numpy(dtype=float)
+    # Floor p at a tiny positive value so -log10(p) is never infinite.
+    p_floor = np.clip(np.nan_to_num(p_vals, nan=1.0), 1e-300, 1.0)
+    df["neglog10p"] = -np.log10(p_floor)
+
+    sig = p_floor <= p_threshold
+    lfc = df["log2fc"].to_numpy(dtype=float)
+    df["Significance"] = np.where(
+        sig & (lfc >= log2fc_threshold), "Up",
+        np.where(sig & (lfc <= -log2fc_threshold), "Down", "NS"),
+    )
+
+    present = [k for k in ("Up", "Down", "NS") if (df["Significance"] == k).any()]
+    cmap = {k: _VOLCANO_COLORS[k] for k in present}
+
+    g = (
+            ggplot(df, aes("log2fc", "neglog10p", color="Significance"))
+            + geom_point(size=point_size, alpha=0.7)
+            + scale_color_manual(values=cmap)
+            + labs(x="log2 fold change", y=f"-log10({pcol})")
+            + theme_minimal(base_size=11)
+            + theme(plot_title=element_text(weight="bold", ha="center"))
+    )
+
+    if log2fc_threshold > 0:
+        g += geom_vline(
+            xintercept=[-log2fc_threshold, log2fc_threshold],
+            linetype="dashed", color="grey", size=0.4,
+        )
+    if 0.0 < p_threshold <= 1.0:
+        g += geom_hline(
+            yintercept=-np.log10(p_threshold),
+            linetype="dashed", color="grey", size=0.4,
+        )
+
+    if save_path:
+        Path(save_path).parent.mkdir(exist_ok=True)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            fig = g.draw()
+            fig.savefig(save_path, dpi=dpi, bbox_inches="tight")
+        plt.close(fig)
+    if show:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            print(g)
+
+    return g

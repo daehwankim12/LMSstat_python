@@ -55,3 +55,74 @@ class TestAllstats:
         assert any("_scheffe" in c for c in cols)
         assert any("KW" in c for c in cols)
         assert any("_dunn" in c for c in cols)
+
+
+class TestAllstatsPosthocOption:
+    def test_default_posthoc_is_scheffe_only(self, three_group_data):
+        result = allstats(three_group_data)
+        cols = result.columns.tolist()
+        assert any("_scheffe" in c for c in cols)
+        assert not any("_games_howell" in c for c in cols)
+
+    def test_posthoc_games_howell(self, three_group_data):
+        result = allstats(three_group_data, posthoc="games_howell")
+        cols = result.columns.tolist()
+        assert any("_games_howell" in c for c in cols)
+        assert not any("_scheffe" in c for c in cols)
+        # same total column count as the scheffe default (swap, not add)
+        assert result.shape == (5, 14)
+
+    def test_posthoc_both(self, three_group_data):
+        result = allstats(three_group_data, posthoc="both")
+        cols = result.columns.tolist()
+        assert any("_scheffe" in c for c in cols)
+        assert any("_games_howell" in c for c in cols)
+        # 3 ttest + 3 utest + 1 ANOVA + 3 scheffe + 3 games_howell + 1 KW + 3 dunn = 17
+        assert result.shape == (5, 17)
+
+    def test_invalid_posthoc_raises(self, three_group_data):
+        with pytest.raises(ValueError):
+            allstats(three_group_data, posthoc="tukey")
+
+    def test_invalid_posthoc_raises_for_two_groups(self, two_group_data):
+        # Validated up front, even though two-group data never runs post-hoc.
+        with pytest.raises(ValueError):
+            allstats(two_group_data, posthoc="tukey")
+
+    def test_posthoc_noop_for_two_groups(self, two_group_data):
+        # No post-hoc columns for two groups regardless of the option.
+        result = allstats(two_group_data, posthoc="games_howell")
+        assert result.shape == (5, 2)
+
+    def test_values_in_01_with_both(self, three_group_data):
+        result = allstats(three_group_data, posthoc="both")
+        assert result.min().min() >= 0.0
+        assert result.max().max() <= 1.0
+
+
+class TestAllstatsAnovaUseVar:
+    def test_default_runs_equal_var(self, three_group_data):
+        result = allstats(three_group_data)
+        assert any("ANOVA" in c for c in result.columns)
+
+    def test_unequal_var_runs(self, three_group_data):
+        result = allstats(three_group_data, anova_use_var="unequal")
+        assert any("ANOVA" in c for c in result.columns)
+        assert result.min().min() >= 0.0
+        assert result.max().max() <= 1.0
+
+    def test_equal_vs_unequal_differ(self, heteroscedastic_data):
+        # Unequal variances + unequal group sizes make Welch and classic ANOVA
+        # diverge for a principled reason, not just sampling noise.
+        eq = allstats(heteroscedastic_data, anova_use_var="equal", p_adj=False)
+        un = allstats(heteroscedastic_data, anova_use_var="unequal", p_adj=False)
+        assert not np.allclose(eq["p-value_ANOVA"].values, un["p-value_ANOVA"].values)
+
+    def test_invalid_use_var_raises(self, three_group_data):
+        with pytest.raises(ValueError):
+            allstats(three_group_data, anova_use_var="bogus")
+
+    def test_invalid_use_var_raises_for_two_groups(self, two_group_data):
+        # Validated up front, even though two-group data never runs ANOVA.
+        with pytest.raises(ValueError):
+            allstats(two_group_data, anova_use_var="bogus")

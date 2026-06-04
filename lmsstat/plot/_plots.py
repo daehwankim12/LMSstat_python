@@ -406,7 +406,7 @@ def _plot_multi(
         Statistics table. Index = variables, columns include p-value columns.
     kind : {"box", "bar"}
         Type of plot for each variable.
-    test_type : {"t-test", "u-test", "scheffe", "dunn"}
+    test_type : {"t-test", "u-test", "scheffe", "games_howell", "dunn"}
         Which p-value column to pick in `stats_res`.
     significant_only : bool
         If True, plot only variables with at least one p-value <= `alpha`
@@ -428,9 +428,9 @@ def _plot_multi(
     if kind not in _KIND:
         raise ValueError("kind must be 'box' or 'bar'.")
 
-    if test_type.lower() not in ("t-test", "u-test", "scheffe", "dunn"):
+    if test_type.lower() not in ("t-test", "u-test", "scheffe", "games_howell", "dunn"):
         raise ValueError(
-            "test_type must be 't-test', 'u-test', 'scheffe', or 'dunn'."
+            "test_type must be 't-test', 'u-test', 'scheffe', 'games_howell', or 'dunn'."
         )
     if not isinstance(significant_only, (bool, np.bool_)):
         raise TypeError("significant_only must be a boolean.")

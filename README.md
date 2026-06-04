@@ -158,7 +158,7 @@ plot.plot_heatmap(data)
 
 ### Correlation plot
 
-Draws a clustered correlation heat map (feature×feature by default). The color
+Draws a clustered correlation heatmap (feature×feature by default). The color
 scale is fixed to `[-1, 1]` so plots stay comparable across runs. Returns the
 seaborn object (`ClusterGrid` when clustered, `Axes` otherwise) and saves a PNG.
 

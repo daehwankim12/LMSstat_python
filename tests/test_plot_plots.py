@@ -315,3 +315,34 @@ class TestPlotCorrelation:
         out = tmp_path / "annot.png"
         plot_correlation(df, annot=True, out_path=str(out))
         assert out.exists()
+
+    def test_cluster_drops_constant_feature(self, tmp_path):
+        df = pd.DataFrame(
+            {"Sample": [f"S{i}" for i in range(6)], "Group": ["A"] * 3 + ["B"] * 3,
+             "M0": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+             "M1": [2.0, 1.0, 4.0, 3.0, 6.0, 5.0],
+             "M2": [5.0] * 6}  # constant → NaN correlations, must be dropped
+        )
+        cg = plot_correlation(df, out_path=str(tmp_path / "c.png"))
+        assert "M2" not in list(cg.data2d.index)
+        assert cg.data2d.shape == (2, 2)
+
+    def test_cluster_too_few_finite_raises(self, tmp_path):
+        df = pd.DataFrame(
+            {"Sample": ["a", "b", "c"], "Group": ["A", "A", "B"],
+             "M0": [1.0, 2.0, 3.0], "M1": [5.0] * 3, "M2": [7.0] * 3}  # two constants
+        )
+        with pytest.raises(ValueError):
+            plot_correlation(df, out_path=str(tmp_path / "x.png"))
+
+    def test_sample_axis_labels_are_sample_ids(self, two_group_data, tmp_path):
+        cg = plot_correlation(two_group_data, axis="sample", out_path=str(tmp_path / "s.png"))
+        sample_ids = set(two_group_data.iloc[:, 0].astype(str))
+        assert set(map(str, cg.data2d.index)) == sample_ids
+
+    def test_out_path_none_no_save(self, two_group_data, tmp_path, monkeypatch):
+        from seaborn.matrix import ClusterGrid
+        monkeypatch.chdir(tmp_path)
+        cg = plot_correlation(two_group_data, out_path=None)
+        assert isinstance(cg, ClusterGrid)
+        assert not (tmp_path / "correlation_plot.png").exists()

@@ -96,6 +96,23 @@ class TestContract:
         assert out["Group"].tolist() == ["A", "B"]
         assert out["Met_0"].isna().all()
 
+    @pytest.mark.parametrize(
+        "fn",
+        [
+            lambda d: impute_missing(d, method="min"),
+            lambda d: log_transform(d),
+            lambda d: normalize(d, method="median"),
+        ],
+    )
+    def test_preserves_input_index(self, fn):
+        df = pd.DataFrame(
+            {"Sample": ["a", "b", "c"], "Group": ["A", "A", "B"],
+             "Met_0": [1.0, 2.0, 3.0], "Met_1": [4.0, 5.0, 6.0]},
+            index=["r1", "r2", "r3"],
+        )
+        out = fn(df)
+        assert list(out.index) == ["r1", "r2", "r3"]
+
 
 # ── impute_missing ─────────────────────────────────────────────────────────
 

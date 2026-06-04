@@ -28,14 +28,12 @@ def _split(data: pd.DataFrame):
 
 
 def _reassemble(data: pd.DataFrame, numeric: pd.DataFrame) -> pd.DataFrame:
-    """Glue Sample/Group back onto a transformed numeric block, preserving order."""
-    return pd.concat(
-        [
-            data[["Sample", "Group"]].reset_index(drop=True),
-            numeric.reset_index(drop=True),
-        ],
-        axis=1,
-    )
+    """Glue Sample/Group back onto a transformed numeric block.
+
+    Preserves both the original column order and the input row index. ``data``
+    and ``numeric`` share the index produced by ``_split``, so they align.
+    """
+    return pd.concat([data[["Sample", "Group"]], numeric], axis=1)
 
 
 def impute_missing(data: pd.DataFrame, method: str = "half_min") -> pd.DataFrame:

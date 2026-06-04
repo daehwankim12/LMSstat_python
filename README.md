@@ -52,6 +52,30 @@ scaled_data.to_csv("scaled_data.csv")
 scaled_data
 ```
 
+### Preprocessing (imputation, log transform, normalization)
+
+All preprocessing functions return a new DataFrame (the input is never mutated)
+and keep the `Sample`/`Group` columns and the original feature order.
+
+```python
+import pandas as pd
+from lmsstat import stat
+
+data = pd.read_csv("data.csv")
+
+# Missing-value imputation: "half_min" (LC-MS below-LOD), "min", or "knn"
+data = stat.impute_missing(data, method="half_min")
+
+# Sample-wise normalization: "median", "total_area", or "pqn"
+data = stat.normalize(data, method="pqn")
+
+# Log transform: log_base(x + offset); base may be 2, 10, np.e, ...
+data = stat.log_transform(data, base=2, offset=1.0)
+```
+
+A typical order is impute → normalize → log transform → `scaling`, after which
+`allstats`, volcano/PLS-DA, and the heatmap operate on cleaner inputs.
+
 ### PCA
 
 ```python

@@ -27,15 +27,16 @@ additions preserve existing defaults and APIs.
   `statsmodels`).
 
 ### Preprocessing & QC
-- `stat.impute_missing(method="half_min" | "min" | "knn")` — missing-value
-  imputation (half-min targets raw, non-negative LC-MS below-LOD values).
-- `stat.normalize(method="median" | "total_area" | "pqn")` — sample-wise
-  dilution normalization (PQN = integral normalization then median-quotient
-  correction).
-- `stat.log_transform(base, offset)` — `log_base(x + offset)`.
-- `stat.rsd_filter(qc_label, max_rsd, return_rsd)` — drop features whose %RSD
-  across the QC samples exceeds a threshold (the standard LC-MS reliability
-  filter); feature filtering only.
+- `stat.impute_missing(data, method="half_min")` — missing-value imputation
+  (`"half_min"` | `"min"` | `"knn"`; half-min targets raw, non-negative LC-MS
+  below-LOD values).
+- `stat.normalize(data, method="median")` — sample-wise dilution normalization
+  (`"median"` | `"total_area"` | `"pqn"`; PQN = integral normalization then
+  median-quotient correction).
+- `stat.log_transform(data, base=2, offset=1.0)` — `log_base(x + offset)`.
+- `stat.rsd_filter(data, qc_label="QC", max_rsd=30.0, return_rsd=False)` — drop
+  features whose %RSD across the QC samples exceeds a threshold (the standard
+  LC-MS reliability filter); feature filtering only.
 - Shared contract for all of the above: the input is never mutated, and the
   `Sample`/`Group` columns, original feature order, and row index are preserved.
 

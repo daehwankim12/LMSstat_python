@@ -24,21 +24,26 @@ data = pd.read_csv("data.csv")  # col 0 = Sample, col 1 = Group, rest = features
 data = stat.rsd_filter(data, qc_label="QC", max_rsd=30)
 data = data[data["Group"] != "QC"].reset_index(drop=True)
 
-# 2. Preprocess: impute -> normalize -> log
+# 2. Preprocess: impute -> normalize. Keep the normalized (pre-log) frame for
+#    fold change; log-transform a separate frame for statistics / ordination.
 data = stat.impute_missing(data, method="half_min")
-data = stat.normalize(data, method="pqn")
-data = stat.log_transform(data, base=2, offset=1.0)
+fc_data = stat.normalize(data, method="pqn")             # pre-log, for fold change
+log_data = stat.log_transform(fc_data, base=2, offset=1.0)
 
-# 3. (optional) scale for ordination / heatmap
-scaled = stat.scaling(data, method="auto")
+# 3. (optional) scale the log data for ordination / heatmap
+scaled = stat.scaling(log_data, method="auto")
 
-# 4. Univariate statistics (+ optional post-hoc / Welch for 3+ groups)
-result = stat.allstats(data)
+# 4. Univariate statistics on the log data (+ optional post-hoc / Welch for 3+
+#    groups). p_adj=False here so the same result can feed the effect-size table
+#    below; use stat.allstats(log_data) for a BH-adjusted table to export.
+stats_res = stat.allstats(log_data, p_adj=False)
 
 # 5. Multivariate & visualization
 plot.plot_pca(scaled)
 plot.plot_plsda(scaled)
-eff = stat.effect_size_table(data)  # two groups
+# Fold change comes from the pre-log normalized frame; the volcano reuses the
+# log-data p-values via stats_res (see the effect-size section below).
+eff = stat.effect_size_table(fc_data, stats_res=stats_res)  # exactly two groups
 plot.plot_volcano(eff)
 ```
 

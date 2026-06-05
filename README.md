@@ -10,6 +10,46 @@ pip install lmsstat
 
 **Input format**: the first two columns must be `Sample` (col 0) and `Group` (col 1). The remaining columns are treated as metabolites/features.
 
+### Recommended workflow
+
+A typical end-to-end pipeline. Each step is documented in its own section below.
+
+```python
+import pandas as pd
+from lmsstat import stat, plot
+
+data = pd.read_csv("data.csv")  # col 0 = Sample, col 1 = Group, rest = features
+
+# 1. QC/RSD feature filtering, then drop the QC samples from the analysis set
+data = stat.rsd_filter(data, qc_label="QC", max_rsd=30)
+data = data[data["Group"] != "QC"].reset_index(drop=True)
+
+# 2. Preprocess: impute -> normalize. Keep the normalized (pre-log) frame for
+#    fold change; log-transform a separate frame for statistics / ordination.
+data = stat.impute_missing(data, method="half_min")
+fc_data = stat.normalize(data, method="pqn")             # pre-log, for fold change
+log_data = stat.log_transform(fc_data, base=2, offset=1.0)
+
+# 3. (optional) scale the log data for ordination / heatmap
+scaled = stat.scaling(log_data, method="auto")
+
+# 4. Univariate statistics on the log data (+ optional post-hoc / Welch for 3+
+#    groups). p_adj=False here so the same result can feed the effect-size table
+#    below; use stat.allstats(log_data) for a BH-adjusted table to export.
+stats_res = stat.allstats(log_data, p_adj=False)
+
+# 5. Multivariate & visualization
+plot.plot_pca(scaled)
+plot.plot_plsda(scaled)
+# Fold change comes from the pre-log normalized frame; the volcano reuses the
+# log-data p-values via stats_res (see the effect-size section below).
+eff = stat.effect_size_table(fc_data, stats_res=stats_res)  # exactly two groups
+plot.plot_volcano(eff)
+```
+
+Skip the QC step if your data has no QC samples. The individual sections below
+cover every function and its options in detail.
+
 ### t-test, u-test, ANOVA, and Kruskal-Wallis test
 
 ```python

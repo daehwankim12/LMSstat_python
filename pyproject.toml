@@ -4,7 +4,7 @@ build-backend   = "flit_core.buildapi"
 
 [project]
 name            = "lmsstat"
-version         = "0.1.1"
+version         = "0.2.0"
 readme          = "README.md"
 authors         = [{ name = "Daehwan Kim", email = "kdh5358@snu.ac.kr" }]
 dynamic         = ["description"]
@@ -15,7 +15,8 @@ dependencies = [
   "scipy >= 1.11.0",
   "statsmodels >= 0.14.2",
   "scikit-learn >= 1.0",
-  "plotnine >= 0.12.0"
+  "plotnine >= 0.12.0",
+  "seaborn >= 0.13.0"
 ]
 
 license         = { file = "LICENSE" }

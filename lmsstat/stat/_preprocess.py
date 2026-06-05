@@ -177,7 +177,13 @@ def normalize(data: pd.DataFrame, method: str = "median") -> pd.DataFrame:
     return _reassemble(data, numeric)
 
 
-def rsd_filter(data, *, qc_label="QC", max_rsd=30.0, return_rsd=False):
+def rsd_filter(
+        data: pd.DataFrame,
+        *,
+        qc_label: str = "QC",
+        max_rsd: float = 30.0,
+        return_rsd: bool = False,
+):
     """
     Drop features whose %RSD across the QC samples exceeds ``max_rsd``.
 

@@ -75,6 +75,11 @@ data = stat.rsd_filter(data, qc_label="QC", max_rsd=30)
 # inspect what was dropped:
 # data, rsd = stat.rsd_filter(data, qc_label="QC", max_rsd=30, return_rsd=True)
 
+# rsd_filter keeps the QC rows (they were only used to compute %RSD). Drop them
+# before downstream analysis so QC is not treated as an analysis group by
+# allstats / PCA / PLS-DA / volcano:
+data = data[data["Group"] != "QC"].reset_index(drop=True)
+
 # Missing-value imputation: "half_min" (LC-MS below-LOD), "min", or "knn"
 data = stat.impute_missing(data, method="half_min")
 
